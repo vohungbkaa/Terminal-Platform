@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>TerManager-Platform</title>
+  <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script defer src="node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script defer src="renderer.js"></script>
+</head>
+<body>
+  <aside id="sidebar" aria-label="Projects">
+    <div class="brand"><span class="logo">❯_</span><div>TerManager-Platform<small id="platform-label"></small></div></div>
+    <div class="section-title">WORKSPACES <button id="add-project" title="Thêm thư mục project" aria-label="Thêm project">＋</button></div>
+    <nav id="projects"></nav>
+    <div class="sidebar-footer"><button id="settings-button">⚙ Thiết lập</button><span id="shell-label"></span></div>
+  </aside>
+  <main>
+    <header><button id="toggle-sidebar" title="Ẩn/hiện sidebar (Ctrl+\)" aria-label="Ẩn/hiện sidebar">☰</button><div class="breadcrumb"><strong id="workspace-title">Terminal</strong><small id="workspace-path"></small></div><button id="commands-button">Lệnh agent</button><button id="new-terminal" class="primary">＋ Terminal</button></header>
+    <div id="terminal-grid"></div>
+    <div id="empty"><span class="empty-icon">❯_</span><h1>Không gian làm việc của bạn</h1><p>Mở terminal tại thư mục project. Mỗi workspace có tối đa 9 terminal.</p><button id="empty-new" class="primary">Mở Terminal · Ctrl+T</button></div>
+    <footer><span id="status"></span><div id="hidden-panes"></div><span id="settings-shortcut"></span></footer>
+  </main>
+  <aside id="commands-panel" hidden aria-label="Lệnh agent"><div class="panel-heading"><h2>Lệnh agent</h2><button id="close-commands" aria-label="Đóng danh sách lệnh">×</button></div><p>Bấm lệnh để mở terminal mới. Kéo lệnh vào terminal để chèn, sau đó nhấn Enter để chạy.</p><div id="commands"></div><button id="add-command">＋ Thêm lệnh</button></aside>
+  <dialog id="settings-dialog"><form id="settings-form"><h2>Thiết lập</h2><label>Shell cho terminal mới<select id="shell"></select></label><label>Cỡ chữ terminal<input id="font-size" type="number" min="9" max="32" required></label><label>Giao diện<select id="theme"><option value="graphite">Graphite</option><option value="obsidian">Obsidian</option><option value="warmDusk">Warm Dusk</option><option value="nordFrost">Nord Frost</option></select></label><p>Đổi workspace giữ nguyên phiên terminal. Khi mở lại ứng dụng, bố cục được khôi phục; lệnh cũ không tự chạy lại.</p><div class="dialog-actions"><button type="button" id="cancel-settings">Hủy</button><button class="primary">Lưu</button></div></form></dialog>
+  <dialog id="text-dialog"><form id="text-form"><h2 id="text-title"></h2><label id="text-label">Tên<input id="text-value" maxlength="200" required></label><label id="command-label" hidden>Lệnh<input id="command-value" maxlength="4096"></label><div class="dialog-actions"><button type="button" id="cancel-text">Hủy</button><button class="primary">Lưu</button></div></form></dialog>
+  <div id="error" role="alert" hidden><span></span><button id="dismiss-error" aria-label="Đóng thông báo">×</button></div>
+</body>
+</html>

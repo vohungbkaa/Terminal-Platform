@@ -1,0 +1,86 @@
+{
+  "name": "termanager-platform",
+  "version": "1.0.1",
+  "description": "Terminal Manager for Windows and macOS",
+  "author": "TerManager",
+  "private": true,
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.cjs",
+    "dist": "electron-builder",
+    "test:smoke": "electron test/smoke.cjs",
+    "test:package": "node test/package.cjs",
+    "dist:win": "electron-builder --win --x64",
+    "dist:mac": "electron-builder --mac",
+    "postinstall": "node scripts/postinstall.cjs",
+    "test:unicode": "electron test/unicode.cjs"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "node-pty": "1.1.0"
+  },
+  "devDependencies": {
+    "electron": "45.5.0",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.termanager.platform",
+    "productName": "TerManager-Platform",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "*.cjs",
+      "*.js",
+      "*.html",
+      "*.css",
+      "!test/**"
+    ],
+    "asarUnpack": [
+      "node_modules/node-pty/**"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "TerManager-Platform-${version}-win-${arch}.${ext}",
+      "appId": "com.termanager.windows"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "npmRebuild": false,
+    "mac": {
+      "identity": "-",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "minimumSystemVersion": "13.0",
+      "artifactName": "TerManager-Platform-${version}-mac-${arch}.${ext}"
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "allowScripts": {
+    "node-pty@1.1.0": true,
+    "electron-winstaller@5.4.0": true
+  }
+}
