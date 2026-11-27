@@ -161,7 +161,7 @@ process.stdin.on('data', data => {
       }
     } catch (error) {
       console.error(error);
-      console.error(await run('(() => { const buffer = [...terminals.values()][0].term.buffer.active; return {cursorX: buffer.cursorX, cursorY: buffer.cursorY, baseY: buffer.baseY, lines: Array.from({length: buffer.length}, (_, i) => buffer.getLine(i).translateToString(true)).filter(Boolean)}; })()'));
+      console.error(await run('(() => { const buffer = [...terminals.values()][0].term.buffer.active; return {input: globalThis.inputData, focused: document.activeElement?.className, textarea: [...terminals.values()][0].term.textarea.value, cursorX: buffer.cursorX, cursorY: buffer.cursorY, baseY: buffer.baseY, lines: Array.from({length: buffer.length}, (_, i) => buffer.getLine(i).translateToString(true)).filter(Boolean)}; })()'));
       exitCode = 1;
     }
     finally {

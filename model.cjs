@@ -123,7 +123,7 @@ function isWithinDirectory(root, directory) {
   return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
 }
 
-async function listDirectory(state, projectId, relative = '') {
+async function resolveProjectPath(state, projectId, relative) {
   text(projectId, 100);
   const project = state.projects.find(item => item.id === projectId);
   if (!project || typeof relative !== 'string' || relative.length > 4096 || relative.includes('\0') || path.isAbsolute(relative)) {
@@ -134,6 +134,11 @@ async function listDirectory(state, projectId, relative = '') {
   if (!isWithinDirectory(root, directory)) {
     throw new Error('Chỉ được duyệt thư mục trong project.');
   }
+  return { project, root, directory };
+}
+
+async function listDirectory(state, projectId, relative = '') {
+  const { project, root, directory } = await resolveProjectPath(state, projectId, relative);
   const entries = await fs.promises.readdir(directory, { withFileTypes: true });
   return (await Promise.all(entries.map(async entry => {
     let isDirectory = entry.isDirectory();
@@ -226,4 +231,4 @@ function detectAgentFromArgs(args) {
   return null;
 }
 
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder, validateOpacity, listDirectory };
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder, validateOpacity, listDirectory, resolveProjectPath };

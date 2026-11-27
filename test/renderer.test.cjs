@@ -8,6 +8,59 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8'
 const context = vm.createContext({});
 vm.runInContext(source.slice(source.indexOf('function quoteDroppedPaths('), source.indexOf('function fit(')), context);
 
+test('sidebar captures drop paths before queuing and adds only validated folders', async () => {
+  const handlers = new Map();
+  const classes = new Set();
+  const added = [];
+  let queued;
+  let prevented = false;
+  const sidebar = {
+    addEventListener: (type, handler) => handlers.set(type, handler),
+    contains: target => target === sidebar,
+    classList: { add: name => classes.add(name), remove: name => classes.delete(name) }
+  };
+  const drop = vm.createContext({
+    $: () => sidebar, error: assert.fail,
+    droppedPaths: transfer => { assert.equal(transfer.available, true); return ['/tmp/folder']; },
+    act: callback => () => { queued = callback; },
+    api: { folders: async paths => { assert.deepEqual(paths, ['/tmp/folder']); return [{ path: paths[0], name: 'folder' }]; } },
+    addProject: async folder => added.push(folder)
+  });
+  vm.runInContext(source.slice(source.indexOf("const sidebar = $('sidebar');"), source.indexOf("$('create-folder').onclick")), drop);
+  const transfer = { types: ['Files'], available: true };
+  const event = { dataTransfer: transfer, preventDefault() { prevented = true; } };
+  handlers.get('dragover')(event);
+  assert.equal(prevented, true);
+  assert.equal(transfer.dropEffect, 'copy');
+  assert.equal(classes.has('drag-over'), true);
+  handlers.get('dragleave')({ relatedTarget: sidebar });
+  assert.equal(classes.has('drag-over'), true);
+  handlers.get('drop')(event);
+  transfer.available = false;
+  assert.equal(classes.has('drag-over'), false);
+  await queued();
+  assert.equal(added[0].path, '/tmp/folder');
+  queued = null;
+  handlers.get('drop')({ dataTransfer: { types: ['text/plain'] } });
+  assert.equal(queued, null);
+});
+
+test('adding a workspace selects duplicates and enforces the project limit', async () => {
+  const state = { projects: [], panes: {} };
+  const projects = vm.createContext({
+    state, platform: 'win32', crypto: { randomUUID: () => 'new' }, update: async change => change(state)
+  });
+  vm.runInContext(source.slice(source.indexOf('async function addProject('), source.indexOf("$('add-project').onclick")), projects);
+  await projects.addProject({ path: 'C:\\Folder', name: 'Folder' });
+  await projects.addProject({ path: 'c:\\folder', name: 'Duplicate' });
+  assert.equal(state.projects.length, 1);
+  assert.equal(state.selected, 'new');
+  state.projects.push(...Array.from({ length: 199 }, (_, id) => ({ id, path: `C:\\${id}` })));
+  await assert.rejects(projects.addProject({ path: 'C:\\Other', name: 'Other' }), /200 project/);
+  await projects.addProject({ path: 'C:\\Folder', name: 'Folder' });
+  assert.equal(state.projects.length, 200);
+});
+
 test('dropped file paths preserve spaces and quotes without executing a command', () => {
   assert.equal(context.quoteDroppedPaths(['/tmp/Dự án/file.txt', "/tmp/it's $(echo no).txt"], '/bin/zsh'), "'/tmp/Dự án/file.txt' '/tmp/it'\\''s $(echo no).txt' ");
   assert.equal(context.quoteDroppedPaths(["C:\\it's here\\file.txt"], 'powershell.exe'), "'C:\\it''s here\\file.txt' ");
@@ -64,6 +117,37 @@ test('overlapping identical IME commits do not duplicate live agent text', () =>
   events.get('compositionend')();
   nativeInput('Tiế');
   assert.equal(sent.join(''), 'aab\x1b[C\rTie\x7fế');
+});
+
+test('first IME composition and Backspace do not resend xay in shell or agent', () => {
+  for (const runningAgent of [null, 'claude']) {
+    const events = new Map();
+    const sent = [];
+    const timers = [];
+    let nativeInput;
+    const input = vm.createContext({
+      api: { input: async (_id, data) => { sent.push(data); } }, error: assert.fail,
+      setTimeout: callback => { timers.push(callback); }
+    });
+    vm.runInContext(source.slice(source.indexOf('function compositionDelta('), source.indexOf('function fit(')), input);
+    const textarea = { value: '' };
+    input.installAgentComposition({ id: 'pane', running: true, runningAgent,
+      host: { addEventListener: (name, callback) => events.set(name, callback), classList: { toggle() {}, remove() {} } },
+      term: { textarea, onData: callback => { nativeInput = callback; } }
+    });
+    events.get('compositionstart')();
+    for (const word of ['x', 'xa', 'xay']) {
+      textarea.value = word;
+      events.get('input')();
+    }
+    nativeInput('xay');
+    nativeInput('\x7f');
+    events.get('compositionend')();
+    nativeInput('xay');
+    for (const callback of timers) callback();
+    nativeInput('\x7f');
+    assert.equal(sent.join(''), 'xay\x7f\x7f', runningAgent || 'shell');
+  }
 });
 
 test('terminal layout requests are combined into one fit per frame', () => {

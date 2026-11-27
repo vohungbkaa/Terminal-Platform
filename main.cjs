@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, clipboard, shell } = require('electron');
 const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
@@ -174,6 +174,18 @@ else {
       const directory = result.filePaths[0];
       return { path: directory, name: path.basename(directory) };
     });
+    handle('project:folders', async paths => {
+      if (!Array.isArray(paths) || !paths.length || paths.length > 200) throw new Error('Chỉ thả tối đa 200 thư mục.');
+      const folders = await Promise.all(paths.map(async directory => {
+        model.text(directory);
+        if (!path.isAbsolute(directory)) throw new Error('Đường dẫn thư mục không hợp lệ.');
+        if (!(await fs.promises.stat(directory)).isDirectory()) return null;
+        return { path: path.normalize(directory), name: path.basename(directory) || directory };
+      }));
+      const directories = folders.filter(Boolean);
+      if (!directories.length) throw new Error('Hãy thả thư mục để thêm workspace.');
+      return directories;
+    });
     handle('project:create-folder', async name => {
       model.text(name, 200);
       const result = await dialog.showOpenDialog(window, { title: 'Chọn nơi tạo thư mục', properties: ['openDirectory'] });
@@ -181,6 +193,23 @@ else {
       return model.createFolder(result.filePaths[0], name);
     });
     handle('project:list-directory', (id, relative) => model.listDirectory(state, id, relative));
+    handle('project:open-file', async (id, relative) => {
+      const { directory: file } = await model.resolveProjectPath(state, id, relative);
+      if (!(await fs.promises.stat(file)).isFile()) throw new Error('Chỉ được mở file trong project.');
+      if (/\.html?$/i.test(file)) {
+        const browser = await app.getApplicationInfoForProtocol('https://example.com');
+        await new Promise((resolve, reject) => {
+          const mac = process.platform === 'darwin';
+          const child = execFile(mac ? '/usr/bin/open' : browser.path, mac ? ['-a', browser.path, file] : [file],
+            { windowsHide: true }, reason => reason ? reject(reason) : resolve());
+          // Browsers on Windows may keep the launched process alive until their window closes.
+          if (!mac) child.once('spawn', resolve);
+        });
+        return;
+      }
+      const reason = await shell.openPath(file);
+      if (reason) throw new Error(`Không mở được file: ${reason}`);
+    });
     handle('terminal:start', id => {
       model.text(id, 100);
       const entity = model.findPane(state, id);

@@ -1009,6 +1009,16 @@ function renderDirectory(project, relative = '') {
     if (entry.directory) {
       row.setAttribute('aria-expanded', String(expanded));
       row.addEventListener('click', () => toggleDirectory(project, entry.relative));
+    } else {
+      row.title = `${entry.path}\nNhấp đúp hoặc nhấn Enter để mở bằng ứng dụng mặc định`;
+      const open = act(() => api.openFile(project.id, entry.relative));
+      row.addEventListener('dblclick', open);
+      row.addEventListener('keydown', event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          open();
+        }
+      });
     }
     tree.append(row);
     if (entry.directory && expanded) tree.append(renderDirectory(project, entry.relative));
@@ -1079,7 +1089,7 @@ function renderSidebar() {
     const emptyHint = document.createElement('button');
     emptyHint.type = 'button';
     emptyHint.className = 'sidebar-empty-hint';
-    emptyHint.innerHTML = `${ICONS.folderPlus}<strong>Thêm thư mục dự án</strong><small>hoặc nhấn + ở góc trên</small>`;
+    emptyHint.innerHTML = `${ICONS.folderPlus}<strong>Thêm thư mục dự án</strong><small>Kéo thư mục vào đây hoặc nhấn +</small>`;
     emptyHint.addEventListener('click', () => $('add-project').click());
     wsGroup.append(emptyHint);
   } else if (filtered.length === 0) {
@@ -1681,6 +1691,7 @@ async function addProject(folder) {
   const existing = state.projects.find(p =>
     platform === 'win32' ? p.path.toLowerCase() === folder.path.toLowerCase() : p.path === folder.path
   );
+  if (!existing && state.projects.length >= 200) throw new Error('Workspace đã có 200 project.');
   const id = existing?.id || crypto.randomUUID();
   await update(s => {
     if (!existing) {
@@ -1694,6 +1705,29 @@ async function addProject(folder) {
 $('add-project').onclick = act(async () => {
   const folder = await api.folder();
   if (folder) await addProject(folder);
+});
+
+const sidebar = $('sidebar');
+sidebar.addEventListener('dragover', event => {
+  if (!event.dataTransfer.types.includes('Files') && !event.dataTransfer.types.includes('application/x-termanager-path')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  sidebar.classList.add('drag-over');
+});
+sidebar.addEventListener('dragleave', event => {
+  if (!sidebar.contains(event.relatedTarget)) sidebar.classList.remove('drag-over');
+});
+sidebar.addEventListener('drop', event => {
+  sidebar.classList.remove('drag-over');
+  if (!event.dataTransfer.types.includes('Files') && !event.dataTransfer.types.includes('application/x-termanager-path')) return;
+  event.preventDefault();
+  try {
+    const paths = droppedPaths(event.dataTransfer);
+    act(async () => {
+      const folders = await api.folders(paths);
+      for (const folder of folders) await addProject(folder);
+    })();
+  } catch (reason) { error(reason); }
 });
 
 $('create-folder').onclick = act(async () => {

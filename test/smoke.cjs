@@ -1,5 +1,5 @@
 // Run using Electron so this checks the actual renderer, preload bridge, PTY and packaged terminal libraries.
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, shell } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -42,6 +42,20 @@ app.on('browser-window-created', (_event, window) => {
       await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'src').click()");
       await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'hello.txt')");
       assert.equal(await run('directoryCache.size'), 2);
+      const originalOpenPath = shell.openPath;
+      const openedFiles = [];
+      shell.openPath = async file => { openedFiles.push(file); return ''; };
+      try {
+        await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'hello.txt').click()");
+        await run('actionQueue');
+        assert.equal(openedFiles.length, 0);
+        await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'hello.txt').dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))");
+        await run('actionQueue');
+        assert.deepEqual(openedFiles, [fs.realpathSync(path.join(temporary, 'src', 'hello.txt'))]);
+        await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'hello.txt').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))");
+        await run('actionQueue');
+        assert.equal(openedFiles.length, 2);
+      } finally { shell.openPath = originalOpenPath; }
       assert.equal(await run("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'deep.txt')"), false);
       await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'nested').click()");
       await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'deep.txt')");
@@ -309,6 +323,28 @@ setInterval(() => {}, 1000);
         assert.equal(await run('state.projects.length'), projectCount + 1);
         assert.equal(await run('state.projects.find(p => p.id === state.selected).path'), path.join(temporary, 'Dự án mới'));
       } finally { dialog.showOpenDialog = originalOpenDialog; }
+      window.webContents.debugger.attach('1.3');
+      try {
+        const count = await run('state.projects.length');
+        const folders = [path.join(temporary, 'src'), path.join(temporary, 'src', 'nested')];
+        await run("(() => { const picker = document.createElement('input'); picker.type = 'file'; picker.multiple = true; picker.hidden = true; picker.id = 'workspace-drop-fixture'; document.body.append(picker); })()");
+        const { root } = await window.webContents.debugger.sendCommand('DOM.getDocument');
+        const { nodeId } = await window.webContents.debugger.sendCommand('DOM.querySelector', { nodeId: root.nodeId, selector: '#workspace-drop-fixture' });
+        await window.webContents.debugger.sendCommand('DOM.setFileInputFiles', { nodeId, files: [...folders, droppedFiles[0]] });
+        await run("globalThis.dropWorkspace = () => { const transfer = new DataTransfer(); for (const file of document.getElementById('workspace-drop-fixture').files) transfer.items.add(file); const sidebar = document.getElementById('sidebar'); const over = new DragEvent('dragover', { dataTransfer: transfer, bubbles: true, cancelable: true }); sidebar.dispatchEvent(over); sidebar.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true })); return over.defaultPrevented; }; void 0");
+        assert.equal(await run('dropWorkspace()'), true);
+        await run('actionQueue');
+        assert.equal(await run('state.projects.length'), count + 2);
+        assert.deepEqual(await run('state.projects.slice(-2).map(project => project.path)'), folders);
+        const selected = await run('state.selected');
+        assert.equal(await run('document.querySelectorAll("#sidebar.drag-over").length'), 0);
+        assert.equal(await run('dropWorkspace()'), true);
+        await run('actionQueue');
+        assert.equal(await run('state.projects.length'), count + 2);
+        assert.equal(await run('state.selected'), selected);
+        assert.equal(model.load(path.join(temporary, 'workspace.json')).selected, selected);
+        await run("document.getElementById('workspace-drop-fixture').remove()");
+      } finally { window.webContents.debugger.detach(); }
       await run("act(() => update(s => { s.panes = {home: []}; s.projects = []; s.selected = 'home'; }))()");
       await waitFor('terminals.size === 0');
       await run("(() => { const transfer = new DataTransfer(); for (const file of nativeDropFiles) transfer.items.add(file); document.getElementById('empty').dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true })); })()");
@@ -318,7 +354,7 @@ setInterval(() => {}, 1000);
       await run("act(() => update(s => { s.panes.home = []; }))()");
       await waitFor('terminals.size === 0');
       assert.equal(await run("document.getElementById('error').hidden"), true);
-      console.log('PASS: native file drops into panes/Launchpad without Enter, automatic command drawer, all four agents, model/effort grouping, real PTY, shell switching/restart, renderer isolation and persistence');
+      console.log('PASS: native folder drops into sidebar with deduplication/persistence, file drops into panes/Launchpad without Enter, automatic command drawer, all four agents, model/effort grouping, real PTY, shell switching/restart, renderer isolation and persistence');
       clearTimeout(timeout); window.destroy();
       // shortcut: leave the temporary profile because Windows locks it until exit; add parent cleanup for frequent runs.
       app.exit(0);

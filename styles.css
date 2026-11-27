@@ -207,6 +207,7 @@ select:focus-visible {
 }
 
 #sidebar[hidden] { opacity: 0; transform: translateX(-8px); pointer-events: none; }
+#sidebar.drag-over { box-shadow: inset 0 0 0 2px var(--accent); }
 
 @starting-style {
   #sidebar:not([hidden]) { opacity: 0; transform: translateX(-8px); }
