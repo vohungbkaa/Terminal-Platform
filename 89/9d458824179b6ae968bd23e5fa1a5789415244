@@ -1,0 +1,33 @@
+test/renderer.test.cjs
+  s_7304d540f07e03::t_2e0e0fd366c5b7 9-44
+styles.css
+  s_7304d540f07e03::t_2e0e0fd366c5b7 2080-2087
+  s_7304d540f07e03::t_af661a663519a2 201
+  s_7304d540f07e03::t_baccefa5e6c88e 1730
+  s_7304d540f07e03::t_b7f949b4fa690f 196-200,202-204,932-937,1429-1434,1724-1726,1729,1734-1744
+  s_7304d540f07e03::t_91993887b2a6f2 1731
+main.cjs
+  s_7304d540f07e03::t_b7f949b4fa690f 222-223
+test/main.test.cjs
+  s_7304d540f07e03::t_2e0e0fd366c5b7 1-23
+renderer.js
+  s_7304d540f07e03::t_b7f949b4fa690f 213,216-217,363,384-389,1215-1222,1324
+test/smoke.cjs
+  s_7304d540f07e03::t_ea992379a6c2b4 28,78,181-185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "899d458824179b6ae968bd23e5fa1a5789415244",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
