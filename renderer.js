@@ -63,17 +63,17 @@ const themes = {
   },
   hacker: {
     id: 'hacker', name: 'Hacker', subtitle: 'Đen sâu · Xanh phosphor',
-    bg: '#020703', sidebarBg: 'rgba(3, 13, 5, 0.96)', toolbarBg: 'rgba(4, 17, 6, 0.96)',
-    surface: '#061009', elevated: '#0c1b10',
-    surfaceHover: 'rgba(120, 255, 70, 0.06)', surfaceActive: 'rgba(120, 255, 70, 0.12)',
-    border: 'rgba(120, 255, 70, 0.20)', borderStrong: 'rgba(120, 255, 70, 0.42)',
-    accent: '#7cff46', accentHover: '#b1ff88', accentSoft: 'rgba(124, 255, 70, 0.14)',
-    text: '#b8ffa0', textSecondary: '#8acb79', muted: '#598653',
-    success: '#7cff46', warning: '#e1e96b', danger: '#ff7777', info: '#80dfb0',
-    terminal: '#020703', terminalFg: '#a4ff78', cursor: '#7cff46',
+    bg: '#050a06', sidebarBg: 'rgba(7, 14, 8, 0.95)', toolbarBg: 'rgba(8, 16, 10, 0.93)',
+    surface: '#09120b', elevated: '#101e13',
+    surfaceHover: 'rgba(43, 212, 74, 0.07)', surfaceActive: 'rgba(43, 212, 74, 0.13)',
+    border: 'rgba(43, 212, 74, 0.17)', borderStrong: 'rgba(43, 212, 74, 0.34)',
+    accent: '#2bd44a', accentHover: '#4de669', accentSoft: 'rgba(43, 212, 74, 0.15)',
+    text: '#7ce88c', textSecondary: '#4ba85c', muted: '#336e3e',
+    success: '#2bd44a', warning: '#d4c953', danger: '#e55d5d', info: '#4bc99c',
+    terminal: '#050a06', terminalFg: '#4be065', cursor: '#2bd44a',
     ansi: [
-      '#07120a', '#ff7777', '#7cff46', '#e1e96b', '#68bda0', '#b7d777', '#80dfb0', '#b8ffa0',
-      '#56804e', '#ffaaaa', '#b1ff88', '#f1f7a1', '#98e2c4', '#d6f3a1', '#b0f8d5', '#e5ffd9'
+      '#0d190f', '#e55d5d', '#2bd44a', '#d4c953', '#49a89a', '#8ccf5b', '#4bc99c', '#7ce88c',
+      '#3e6e47', '#f08686', '#5ceb76', '#e6dc7a', '#6ec7ba', '#ade082', '#73dec0', '#c8f7ce'
     ]
   },
   nordFrost: {
@@ -1334,6 +1334,8 @@ function makeTerminal(pane) {
     cursorBlink: true,
     fontFamily: "'JetBrains Mono', 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace",
     fontSize: state.settings.fontSize,
+    fontWeight: '500',
+    fontWeightBold: '700',
     scrollback: 5000,
     theme: xtermThemeFor(t),
     allowProposedApi: false

@@ -1952,6 +1952,7 @@ dialog.settings-sheet {
   background: var(--terminal);
   border: 1px solid var(--border);
   color: var(--accent-hover);
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
