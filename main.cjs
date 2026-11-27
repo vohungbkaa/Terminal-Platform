@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, clipboard } = require('electron');
+const { execFile } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -9,13 +10,89 @@ const model = require('./model.cjs');
 if (process.platform === 'win32') app.setPath('userData', path.join(app.getPath('appData'), 'termanager-windows'));
 let window, state, stateFile;
 const sessions = new Map();
+const sessionAgents = new Map();
 const stopping = new Set();
+let agentPollTimer = null;
+let agentQuickCheckTimer = null;
+let agentPollPending = false;
 const pageURL = pathToFileURL(path.join(__dirname, 'index.html')).href;
+
+function emitAgentState(id, detected) {
+  const prev = sessionAgents.get(id) || { agent: null, model: null };
+  const next = detected ? { agent: detected.agent || null, model: detected.model || null } : { agent: null, model: null };
+  if (prev.agent === next.agent && prev.model === next.model) return;
+  if (next.agent) sessionAgents.set(id, next);
+  else sessionAgents.delete(id);
+  if (window && !window.isDestroyed()) {
+    window.webContents.send('terminal:agent', id, next.agent, next.model);
+  }
+}
+
+function pollRunningAgents() {
+  if (sessions.size === 0 || agentPollPending) return;
+  if (process.platform === 'win32') {
+    for (const [id, session] of sessions) {
+      emitAgentState(id, model.detectAgentFromArgs(session.process || ''));
+    }
+    return;
+  }
+  agentPollPending = true;
+  execFile('ps', ['-eo', 'pid=,ppid=,args='], { maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+    agentPollPending = false;
+    if (err || !stdout) return;
+    const childrenByPpid = new Map();
+    for (const line of stdout.split('\n')) {
+      const match = line.match(/^\s*(\d+)\s+(\d+)\s+(.+)$/);
+      if (!match) continue;
+      const pid = Number(match[1]);
+      const ppid = Number(match[2]);
+      let list = childrenByPpid.get(ppid);
+      if (!list) { list = []; childrenByPpid.set(ppid, list); }
+      list.push({ pid, args: match[3] });
+    }
+    for (const [id, session] of sessions) {
+      const queue = [...(childrenByPpid.get(session.pid) || [])];
+      const visited = new Set([session.pid]);
+      let detected = null;
+      while (queue.length > 0) {
+        const proc = queue.shift();
+        if (visited.has(proc.pid)) continue;
+        visited.add(proc.pid);
+        const found = model.detectAgentFromArgs(proc.args);
+        if (found) { detected = found; break; }
+        const kids = childrenByPpid.get(proc.pid);
+        if (kids) queue.push(...kids);
+      }
+      emitAgentState(id, detected);
+    }
+  });
+}
+
+function syncAgentPolling() {
+  if (sessions.size > 0 && !agentPollTimer) {
+    agentPollTimer = setInterval(pollRunningAgents, 1200);
+    agentPollTimer.unref();
+  } else if (sessions.size === 0 && agentPollTimer) {
+    clearInterval(agentPollTimer);
+    agentPollTimer = null;
+  }
+}
+
+function scheduleQuickAgentCheck() {
+  if (agentQuickCheckTimer) clearTimeout(agentQuickCheckTimer);
+  agentQuickCheckTimer = setTimeout(() => {
+    agentQuickCheckTimer = null;
+    pollRunningAgents();
+  }, 350);
+  agentQuickCheckTimer.unref();
+}
 
 function stop(id) {
   const session = sessions.get(id);
   if (!session) return;
   sessions.delete(id);
+  emitAgentState(id, null);
+  syncAgentPolling();
   const exited = new Promise(resolve => {
     const timeout = setTimeout(() => { if (process.platform !== 'win32') session.kill('SIGKILL'); }, 2000);
     timeout.unref();
@@ -56,6 +133,18 @@ else {
     window.webContents.on('will-navigate', event => event.preventDefault());
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     handle('workspace:load', () => ({ state, home: os.homedir(), platform: process.platform, arch: process.arch, shells: model.shells }));
+    handle('agent:models', agent => {
+      if (agent !== 'agy') throw new Error('Agent không hỗ trợ danh sách model.');
+      return new Promise((resolve, reject) => {
+        execFile(process.platform === 'win32' ? 'agy.exe' : 'agy', ['models'], {
+          timeout: 10000, maxBuffer: 1024 * 1024,
+          env: { ...process.env, PATH: [process.env.PATH, path.join(os.homedir(), '.local', 'bin')].filter(Boolean).join(path.delimiter) }
+        }, (err, stdout) => {
+          if (err) return reject(new Error('Không tải được model từ agy models.'));
+          resolve(model.parseAgentModels(stdout));
+        });
+      });
+    });
     handle('workspace:save', async next => {
       model.save(stateFile, next);
       state = next;
@@ -98,10 +187,13 @@ else {
         env
       });
       sessions.set(id, session);
+      syncAgentPolling();
       session.onData(data => { if (!window.isDestroyed()) window.webContents.send('terminal:output', id, data); });
       session.onExit(({ exitCode }) => {
         if (sessions.get(id) !== session) return;
         sessions.delete(id);
+        emitAgentState(id, null);
+        syncAgentPolling();
         if (!window.isDestroyed()) window.webContents.send('terminal:exit', id, exitCode);
       });
     });
@@ -111,6 +203,7 @@ else {
       const session = sessions.get(id);
       if (!session) throw new Error('Terminal đã dừng.');
       session.write(data);
+      if (/[\r\n\u0003\u0004]/.test(data)) scheduleQuickAgentCheck();
     });
     handle('terminal:resize', (id, cols, rows) => {
       if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 1 || cols > 1000 || rows > 1000) throw new Error('Kích thước terminal không hợp lệ.');

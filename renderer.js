@@ -10,6 +10,7 @@ let isHoveringAgentDrawer = false;
 let agentHideTimer = null;
 const collapsedProjects = new Set();
 const terminals = new Map();
+let activeModelPopover = null;
 
 // Exact 4 curated themes synced from native TerManager (Theme.swift)
 const themes = {
@@ -350,6 +351,7 @@ function render() {
   $('terminal-grid').style.gridTemplateRows = `repeat(${rows}, minmax(0, 1fr))`;
 
   const allIDs = new Set(Object.values(state.panes).flat().map(p => p.id));
+  if (activeModelPopover && !allIDs.has(activeModelPopover.paneId)) closeModelPopover();
   for (const [id, view] of terminals) {
     if (!allIDs.has(id)) {
       view.observer.disconnect();
@@ -369,6 +371,7 @@ function render() {
       view.node.classList.toggle('maximized', maximized === pane.id);
       view.node.classList.toggle('exited', !view.running);
       view.title.textContent = pane.name;
+      updatePaneModelButton(view, pane);
       view.zoomBtn.innerHTML = maximized === pane.id ? ICONS.compress : ICONS.expand;
       view.zoomBtn.classList.toggle('active', maximized === pane.id);
       view.zoomBtn.title = maximized === pane.id ? 'Thu về lưới' : 'Phóng to Terminal này';
@@ -415,6 +418,333 @@ function render() {
     })));
     $('hidden-panes').append(pill);
   }
+}
+
+const AGENT_MODELS = {
+  claude: {
+    key: 'claude', name: 'Claude Code', tint: '#e59853', icon: ICONS.sparkles,
+    models: [
+      { id: 'sonnet', label: 'Sonnet' },
+      { id: 'opus', label: 'Opus' },
+      { id: 'haiku', label: 'Haiku' },
+      { id: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+      { id: 'claude-opus-4-1', label: 'Opus 4.1' }
+    ]
+  },
+  codex: {
+    key: 'codex', name: 'Codex', tint: '#38bdf8', icon: ICONS.terminal,
+    models: [
+      { id: 'gpt-5.4', label: 'GPT-5.4' },
+      { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
+      { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
+      { id: 'o3', label: 'o3' },
+      { id: 'o4-mini', label: 'o4-mini' }
+    ]
+  },
+  gemini: {
+    key: 'gemini', name: 'Gemini', tint: '#a78bfa', icon: ICONS.sparkles,
+    models: [
+      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' }
+    ]
+  },
+  agy: {
+    key: 'agy', name: 'Antigravity', tint: '#5e9bff', icon: ICONS.bolt,
+    models: []
+  }
+};
+
+function findPaneState(paneId) {
+  return Object.values(state.panes).flat().find(p => p.id === paneId) || null;
+}
+
+function extractCommandModel(command) {
+  if (!command) return undefined;
+  const match = command.match(/(?:^|\s)(?:--model|-m)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  const value = match && (match[1] || match[2] || match[3]);
+  return value ? value.trim().slice(0, 200) : undefined;
+}
+
+function activeModelForView(view) {
+  if (!view?.runningAgent) return null;
+  return view.detectedModel || null;
+}
+
+// shortcut: read agy’s visible status format; update this matcher if its footer layout changes.
+function agyModelFromStatus(lines, models) {
+  for (const line of [...lines].reverse()) {
+    if (!line.includes('? for shortcuts')) continue;
+    const found = models.find(item => line.trimEnd().endsWith(
+      item.label.replace(/ \((Low|Medium|High|XHigh|Max)\)$/, (_, effort) => ` · ${effort.toLowerCase()}`)
+    ));
+    if (found) return found.id;
+  }
+  return null;
+}
+
+function syncAgyModel(view) {
+  if (view.runningAgent !== 'agy') return;
+  const buffer = view.term.buffer.active;
+  const lines = Array.from({ length: view.term.rows }, (_, i) => buffer.getLine(buffer.baseY + i)?.translateToString() || '');
+  const detected = agyModelFromStatus(lines, AGENT_MODELS.agy.models);
+  if (detected && detected !== view.detectedModel) {
+    view.detectedModel = detected;
+    updatePaneModelButton(view, findPaneState(view.id));
+  }
+}
+
+function groupModelVariants(models) {
+  const groups = new Map();
+  const levels = ['Low', 'Medium', 'High', 'XHigh', 'Max'];
+  for (const model of models) {
+    const match = model.label.match(/^(.*) \((Low|Medium|High|XHigh|Max)\)$/);
+    const label = match ? match[1] : model.label;
+    if (!groups.has(label)) groups.set(label, { label, variants: [] });
+    groups.get(label).variants.push({ ...model, effort: match ? match[2] : null });
+  }
+  for (const group of groups.values()) {
+    group.variants.sort((a, b) => levels.indexOf(a.effort) - levels.indexOf(b.effort));
+  }
+  return [...groups.values()];
+}
+
+function modelLabelFor(agentKey, modelId) {
+  if (!modelId) return 'Model';
+  const group = agentKey && AGENT_MODELS[agentKey];
+  const found = group?.models.find(m => m.id === modelId);
+  return found ? found.label : modelId;
+}
+
+function updatePaneModelButton(view, pane) {
+  if (!view.modelBtn) return;
+  const agentKey = view.running ? view.runningAgent : null;
+  const group = agentKey ? AGENT_MODELS[agentKey] : null;
+  if (!group) {
+    view.modelBtn.hidden = true;
+    view.modelBtn.classList.remove('open', 'has-model');
+    if (activeModelPopover?.paneId === view.id) closeModelPopover();
+    return;
+  }
+  const activeModel = activeModelForView(view, pane);
+  const label = modelLabelFor(agentKey, activeModel);
+  view.modelBtn.hidden = false;
+  view.modelBtn.classList.toggle('has-model', Boolean(activeModel));
+  view.modelBtn.classList.toggle('open', activeModelPopover?.paneId === view.id);
+  view.modelBtn.style.setProperty('--model-tint', group.tint);
+  view.modelBtn.querySelector('.pane-model-label').textContent = label;
+  view.modelBtn.title = activeModel
+    ? `${group.name} • Model: ${activeModel} • Nhấn để đổi model`
+    : `${group.name} • Chưa xác định model • Nhấn để đổi model (/model)`;
+}
+
+function closeModelPopover() {
+  if (!activeModelPopover) return;
+  const { node, paneId, onOutside, onKeyDown, onResize } = activeModelPopover;
+  activeModelPopover = null;
+  node.remove();
+  document.removeEventListener('mousedown', onOutside, true);
+  document.removeEventListener('keydown', onKeyDown, true);
+  window.removeEventListener('resize', onResize);
+  const view = terminals.get(paneId);
+  if (view?.modelBtn) view.modelBtn.classList.remove('open');
+}
+
+async function applyPaneModel(paneId, modelId) {
+  const view = terminals.get(paneId);
+  if (!view || !view.running || !view.runningAgent) {
+    throw new Error('Không có agent nào đang chạy trong terminal này.');
+  }
+  const cleanModel = (modelId || '').trim();
+  await api.input(paneId, cleanModel ? `/model ${cleanModel}\r` : '/model\r');
+  view.term.focus();
+}
+
+async function openModelPopover(paneId, anchorBtn) {
+  if (activeModelPopover?.paneId === paneId) {
+    closeModelPopover();
+    return;
+  }
+  closeModelPopover();
+
+  const view = terminals.get(paneId);
+  const pane = findPaneState(paneId);
+  const agentKey = view?.running ? view.runningAgent : null;
+  const group = agentKey ? AGENT_MODELS[agentKey] : null;
+  if (!pane || !group) return;
+  if (agentKey === 'agy') {
+    try { group.models = await api.agentModels('agy'); }
+    catch (reason) { error(reason); return; }
+    if (terminals.get(paneId) !== view || view.runningAgent !== agentKey || !view.running) return;
+    syncAgyModel(view);
+    closeModelPopover();
+  }
+
+  const popover = document.createElement('div');
+  popover.className = 'model-popover';
+  popover.setAttribute('role', 'menu');
+  popover.setAttribute('aria-label', `Chọn model cho ${group.name}`);
+
+  const positionPopover = () => {
+    const rect = anchorBtn.getBoundingClientRect();
+    const popRect = popover.getBoundingClientRect();
+    const width = popRect.width || 228;
+    const height = popRect.height || 240;
+    const left = Math.min(window.innerWidth - width - 8, Math.max(8, rect.right - width));
+    const top = rect.bottom + height + 12 > window.innerHeight
+      ? Math.max(8, rect.top - height - 6)
+      : rect.bottom + 6;
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  };
+
+  const currentModel = activeModelForView(view, pane);
+
+  const header = document.createElement('div');
+  header.className = 'model-popover-header';
+  header.style.setProperty('--group-tint', group.tint);
+  header.innerHTML = `${group.icon}<span>Model ${group.name}</span>`;
+  popover.append(header);
+
+  const list = document.createElement('div');
+  list.className = 'model-popover-list';
+
+  const section = document.createElement('div');
+  section.className = 'model-group';
+
+  const families = groupModelVariants(group.models);
+  let selectedFamily = families.find(item => item.variants.some(v => v.id === currentModel)) || families[0];
+  let selectedVariant = selectedFamily?.variants.find(v => v.id === currentModel)
+    || selectedFamily?.variants.find(v => v.effort === 'Medium') || selectedFamily?.variants[0];
+
+  const effortControl = document.createElement('div');
+  effortControl.className = 'model-effort';
+  const effortLabel = document.createElement('div');
+  effortLabel.className = 'model-effort-label';
+  const effortValue = document.createElement('strong');
+  const effortModel = document.createElement('span');
+  effortLabel.append(effortValue, effortModel);
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.step = '1';
+  slider.setAttribute('aria-label', 'Mức reasoning');
+  const ticks = document.createElement('div');
+  ticks.className = 'model-effort-ticks';
+  effortControl.append(effortLabel, slider, ticks);
+
+  const refreshSelection = () => {
+    for (const [index, button] of [...section.children].entries()) {
+      const selected = families[index] === selectedFamily;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-checked', String(selected));
+    }
+    effortControl.hidden = !selectedFamily || selectedFamily.variants.length < 2;
+    if (!selectedVariant) return;
+    effortValue.textContent = selectedVariant.effort || '';
+    effortModel.textContent = selectedFamily.label;
+    slider.max = String(selectedFamily.variants.length - 1);
+    slider.value = String(selectedFamily.variants.indexOf(selectedVariant));
+    slider.setAttribute('aria-valuetext', selectedVariant.effort || selectedVariant.label);
+    ticks.replaceChildren(...selectedFamily.variants.map(variant => {
+      const tick = document.createElement('span');
+      tick.textContent = '•';
+      tick.title = variant.effort || variant.label;
+      return tick;
+    }));
+    positionPopover();
+  };
+
+  for (const family of families) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'model-option';
+    btn.setAttribute('role', 'menuitemradio');
+    btn.dataset.modelId = family.variants[0].id;
+    btn.dataset.agentKey = group.key;
+    const nameEl = document.createElement('strong');
+    nameEl.textContent = family.label;
+    const textWrap = document.createElement('span');
+    textWrap.className = 'model-option-text';
+    textWrap.append(nameEl);
+    btn.append(textWrap);
+    btn.addEventListener('click', act(async () => {
+      const variant = family.variants.find(v => v.effort === selectedVariant?.effort)
+        || family.variants.find(v => v.effort === 'Medium') || family.variants[0];
+      await applyPaneModel(paneId, variant.id);
+      selectedFamily = family;
+      selectedVariant = variant;
+      refreshSelection();
+      if (family.variants.length === 1) closeModelPopover();
+      else slider.focus();
+    }));
+    section.append(btn);
+  }
+
+  slider.addEventListener('input', () => {
+    const variant = selectedFamily.variants[Number(slider.value)];
+    effortValue.textContent = variant.effort;
+    slider.setAttribute('aria-valuetext', variant.effort);
+  });
+  slider.addEventListener('change', act(async () => {
+    const variant = selectedFamily.variants[Number(slider.value)];
+    await applyPaneModel(paneId, variant.id);
+    selectedVariant = variant;
+    refreshSelection();
+    slider.focus();
+  }));
+
+  list.append(section);
+  popover.append(list, effortControl);
+
+  const footer = document.createElement('div');
+  footer.className = 'model-popover-footer';
+
+  const customBtn = document.createElement('button');
+  customBtn.type = 'button';
+  customBtn.className = 'model-footer-btn';
+  customBtn.innerHTML = `${ICONS.pencil}<span>Nhập model tùy chỉnh...</span>`;
+  customBtn.addEventListener('click', act(async () => {
+    closeModelPopover();
+    const latestView = terminals.get(paneId);
+    const latestPane = findPaneState(paneId);
+    const result = await ask(`Đổi model ${group.name}`, activeModelForView(latestView, latestPane) || '');
+    if (result) await applyPaneModel(paneId, result.name);
+  }));
+
+  const interactiveBtn = document.createElement('button');
+  interactiveBtn.type = 'button';
+  interactiveBtn.className = 'model-footer-btn mono';
+  interactiveBtn.innerHTML = `${ICONS.terminal}<span>Gửi lệnh /model</span>`;
+  interactiveBtn.addEventListener('click', act(async () => {
+    closeModelPopover();
+    await applyPaneModel(paneId, '');
+  }));
+
+  footer.append(customBtn, interactiveBtn);
+  popover.append(footer);
+
+  document.body.append(popover);
+  anchorBtn.classList.add('open');
+  refreshSelection();
+
+  const onOutside = event => {
+    if (!popover.contains(event.target) && !anchorBtn.contains(event.target)) closeModelPopover();
+  };
+  const onKeyDown = event => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closeModelPopover();
+      terminals.get(paneId)?.term.focus();
+    }
+  };
+  const onResize = () => closeModelPopover();
+
+  document.addEventListener('mousedown', onOutside, true);
+  document.addEventListener('keydown', onKeyDown, true);
+  window.addEventListener('resize', onResize);
+
+  activeModelPopover = { node: popover, paneId, anchorBtn, onOutside, onKeyDown, onResize };
 }
 
 function agentMetaFor(preset) {
@@ -798,6 +1128,17 @@ function makeTerminal(pane) {
     }
   }));
 
+  const modelBtn = document.createElement('button');
+  modelBtn.type = 'button';
+  modelBtn.className = 'pane-model-btn';
+  modelBtn.hidden = true;
+  modelBtn.setAttribute('aria-haspopup', 'menu');
+  modelBtn.innerHTML = `${ICONS.sparkles}<span class="pane-model-label">Model</span>${ICONS.chevronDown}`;
+  modelBtn.addEventListener('click', event => {
+    event.stopPropagation();
+    openModelPopover(pane.id, modelBtn);
+  });
+
   const actions = document.createElement('div');
   actions.className = 'pane-actions';
 
@@ -805,6 +1146,9 @@ function makeTerminal(pane) {
     if (view.running && !confirm('Dừng phiên hiện tại và mở shell mới?')) return;
     await api.kill(pane.id);
     view.running = false;
+    view.runningAgent = null;
+    view.detectedModel = null;
+    updatePaneModelButton(view, findPaneState(pane.id));
     view.term.reset();
     await start(view);
   }, 'pane-btn');
@@ -826,7 +1170,7 @@ function makeTerminal(pane) {
   }, 'pane-btn danger');
 
   actions.append(restartBtn, hideBtn, zoomBtn, closeBtn);
-  header.append(dot, title, actions);
+  header.append(dot, title, modelBtn, actions);
 
   const host = document.createElement('div');
   host.className = 'terminal-host';
@@ -847,14 +1191,16 @@ function makeTerminal(pane) {
   term.open(host);
 
   const view = {
-    id: pane.id, node, host, title, zoomBtn, term, fit: addon,
-    running: false, observer: new ResizeObserver(() => fit(view))
+    id: pane.id, node, host, title, modelBtn, zoomBtn, term, fit: addon,
+    running: false, runningAgent: null, detectedModel: null, observer: new ResizeObserver(() => fit(view))
   };
   terminals.set(pane.id, view);
+  updatePaneModelButton(view, pane);
   view.observer.observe(host);
 
   term.onData(data => { if (view.running) api.input(pane.id, data).catch(error); });
   term.onTitleChange(value => { node.title = value; });
+  term.onWriteParsed(() => syncAgyModel(view));
   term.attachCustomKeyEventHandler(event => {
     const modifier = platform === 'darwin' ? event.metaKey : event.ctrlKey;
     if (modifier && ['t', ',', '\\'].includes(event.key.toLowerCase())) return false;
@@ -876,10 +1222,23 @@ function makeTerminal(pane) {
   node.addEventListener('drop', event => {
     node.classList.remove('drag-over');
     const command = event.dataTransfer.getData('application/x-termanager-command');
+    const cmdTitle = event.dataTransfer.getData('application/x-termanager-title');
     if (!command) return;
     event.preventDefault();
-    if (view.running) { term.paste(command); term.focus(); }
-    else error(new Error('Terminal đã dừng. Bấm khởi động lại để mở lại.'));
+    if (view.running) {
+      api.input(pane.id, command + '\r').catch(error);
+      term.focus();
+      const meta = agentMetaFor({ title: cmdTitle || '', command });
+      const droppedModel = extractCommandModel(command);
+      if (meta.key !== 'custom' || droppedModel) {
+        act(() => update(s => {
+          const target = Object.values(s.panes).flat().find(p => p.id === pane.id);
+          if (!target) return;
+          if (meta.key !== 'custom') target.agent = meta.key;
+          if (droppedModel) target.model = droppedModel;
+        }))();
+      }
+    } else error(new Error('Terminal đã dừng. Bấm khởi động lại để mở lại.'));
   });
 
   view.ready = start(view);
@@ -906,9 +1265,14 @@ async function newTerminal(command, customName) {
     throw new Error('Workspace đã có 9 terminal. Hãy đóng một terminal trước.');
   }
   const id = crypto.randomUUID();
+  const meta = command ? agentMetaFor({ title: customName || '', command }) : null;
+  const detectedModel = extractCommandModel(command);
   await update(s => {
     const list = (s.panes[s.selected] ||= []);
-    list.push({ id, name: customName || `Terminal ${list.length + 1}`, hidden: false });
+    const pane = { id, name: customName || `Terminal ${list.length + 1}`, hidden: false };
+    if (meta && meta.key !== 'custom') pane.agent = meta.key;
+    if (detectedModel) pane.model = detectedModel;
+    list.push(pane);
   });
   const view = terminals.get(id);
   await view.ready;
@@ -924,10 +1288,30 @@ function setSidebarCollapsed(collapsed) {
 }
 
 api.onOutput((id, data) => terminals.get(id)?.term.write(data));
+api.onAgent((id, agent, detectedModel) => {
+  const view = terminals.get(id);
+  if (!view) return;
+  const nextAgent = agent && Object.hasOwn(AGENT_MODELS, agent) ? agent : null;
+  if (view.runningAgent !== nextAgent && activeModelPopover?.paneId === id) closeModelPopover();
+  const agentChanged = view.runningAgent !== nextAgent;
+  view.runningAgent = nextAgent;
+  view.detectedModel = detectedModel || null;
+  if (nextAgent === 'agy' && agentChanged) {
+    api.agentModels('agy').then(models => {
+      AGENT_MODELS.agy.models = models;
+      if (terminals.get(id) === view) syncAgyModel(view);
+    }).catch(error);
+  }
+  syncAgyModel(view);
+  updatePaneModelButton(view, findPaneState(id));
+});
 api.onExit((id, code) => {
   const view = terminals.get(id);
   if (view) {
     view.running = false;
+    view.runningAgent = null;
+    view.detectedModel = null;
+    updatePaneModelButton(view, findPaneState(id));
     view.node.classList.add('exited');
     view.term.writeln(`\r\n[Đã kết thúc: ${code}. Bấm khởi động lại để mở lại.]`);
   }

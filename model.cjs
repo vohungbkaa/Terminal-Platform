@@ -51,6 +51,8 @@ function validate(state) {
     for (const pane of panes) {
       text(pane.id, 100); text(pane.name, 200);
       if (!/^[a-zA-Z0-9-]+$/.test(pane.id) || paneIDs.has(pane.id) || typeof pane.hidden !== 'boolean') throw new Error('Terminal không hợp lệ.');
+      if (pane.agent !== undefined) text(pane.agent, 40);
+      if (pane.model !== undefined) text(pane.model, 200);
       paneIDs.add(pane.id);
     }
   }
@@ -98,4 +100,65 @@ function save(file, state) {
   fs.writeFileSync(temporary, JSON.stringify(state, null, 2), { mode: 0o600 });
   fs.renameSync(temporary, file);
 }
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells };
+const AGENT_RUNNERS = new Set(['env', 'node', 'nodejs', 'bun', 'deno', 'npx', 'pnpx', 'python', 'python3', 'sh', 'bash', 'zsh']);
+const AGENT_BINARIES = new Map([
+  ['claude', 'claude'],
+  ['claude-code', 'claude'],
+  ['codex', 'codex'],
+  ['gemini', 'gemini'],
+  ['gemini-cli', 'gemini'],
+  ['agy', 'agy'],
+  ['antigravity', 'agy']
+]);
+
+function parseAgentModels(output) {
+  return output.split(/\r?\n/).flatMap(line => {
+    const match = line.match(/^([a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199})\t([^\t\x00-\x1f]{1,200})$/);
+    return match ? [{ id: match[1], label: match[2].trim() }] : [];
+  });
+}
+
+function extractModelFlag(command) {
+  if (typeof command !== 'string' || !command) return null;
+  const match = command.match(/(?:^|\s)(?:--model|-m)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/);
+  const value = match && (match[1] || match[2] || match[3]);
+  return value ? value.trim().slice(0, 200) : null;
+}
+
+function normalizeBinaryToken(token) {
+  if (!token) return '';
+  const cleaned = token.replace(/^['"]|['"]$/g, '');
+  const base = path.basename(cleaned.replace(/\\/g, '/')).toLowerCase();
+  return base.replace(/\.(exe|cmd|bat|mjs|cjs|js)$/i, '');
+}
+
+function detectAgentFromArgs(args) {
+  if (typeof args !== 'string' || !args.trim()) return null;
+  const tokens = args.trim().split(/\s+/);
+  let index = 0;
+  while (index < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[index])) index++;
+  const first = normalizeBinaryToken(tokens[index]);
+  if (!first) return null;
+  if (AGENT_BINARIES.has(first)) {
+    return { agent: AGENT_BINARIES.get(first), model: extractModelFlag(args) };
+  }
+  if (AGENT_RUNNERS.has(first)) {
+    let sawFirstArg = false;
+    for (let i = index + 1; i < tokens.length; i++) {
+      const tok = tokens[i];
+      if (!tok || /^[A-Za-z_][A-Za-z0-9_]*=/.test(tok)) continue;
+      if (tok.startsWith('-')) {
+        if (sawFirstArg) break;
+        continue;
+      }
+      const candidate = normalizeBinaryToken(tok);
+      if (AGENT_BINARIES.has(candidate) && (!sawFirstArg || tok.includes('/') || tok.includes('\\'))) {
+        return { agent: AGENT_BINARIES.get(candidate), model: extractModelFlag(args) };
+      }
+      if (!AGENT_RUNNERS.has(candidate)) sawFirstArg = true;
+    }
+  }
+  return null;
+}
+
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels };

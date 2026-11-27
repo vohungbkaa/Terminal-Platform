@@ -30,6 +30,47 @@ app.on('browser-window-created', (_event, window) => {
       assert.deepEqual(await run('Array.from({length: 10}, (_, i) => grid(i))'), [[1,1],[1,1],[1,2],[2,2],[2,2],[2,3],[2,3],[3,3],[3,3],[3,3]]);
       await run("document.getElementById('new-terminal').click()");
       await waitFor("terminals.size === 1 && [...terminals.values()][0].running");
+      assert.equal(await run("document.querySelector('.pane-model-btn').hidden"), true);
+      if (process.platform !== 'win32') {
+        const fakeClaude = path.join(temporary, 'claude');
+        fs.writeFileSync(fakeClaude, 'setInterval(() => {}, 1000);\n');
+        await run(`(() => {
+          const transfer = new DataTransfer();
+          transfer.setData('application/x-termanager-command', ${JSON.stringify(`node "${fakeClaude}"`)});
+          transfer.setData('application/x-termanager-title', 'claude • Default');
+          document.querySelector('.pane').dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true }));
+        })()`);
+        await waitFor("!document.querySelector('.pane-model-btn').hidden");
+        await run("document.querySelector('.pane-model-btn').click()");
+        await waitFor("Boolean(document.querySelector('.model-popover .model-option[data-model-id=\"sonnet\"]'))");
+        assert.equal(await run("Boolean(document.querySelector('.model-popover .model-option[data-agent-key=\"codex\"]'))"), false);
+        assert.equal(await run("document.querySelector('.model-effort').hidden"), true);
+        await run("document.querySelector('.model-popover .model-option[data-model-id=\"sonnet\"]').click()");
+        await run('actionQueue');
+        assert.equal(await run("document.querySelector('.pane-model-label').textContent"), 'Model');
+        assert.equal(await run("state.panes.home[0].model"), undefined);
+        await run("window.desktop.input([...terminals.keys()][0], '\\u0003')");
+        await waitFor("document.querySelector('.pane-model-btn').hidden");
+      }
+      if (process.platform !== 'win32') {
+        const fakeAgy = path.join(temporary, 'agy');
+        fs.writeFileSync(fakeAgy, '#!/bin/sh\nif [ "$1" = models ]; then\n  printf "neon-medium\\tGemini 4 Neon (Medium)\\nneon-high\\tGemini 4 Neon (High)\\n"\nelse\n  printf "? for shortcuts    Gemini 4 Neon · medium\\n"\n  while IFS= read -r line; do [ "$line" = "/model neon-high" ] || continue; printf "? for shortcuts    Gemini 4 Neon · high\\n"; done\nfi\n', { mode: 0o700 });
+        process.env.PATH = temporary + path.delimiter + process.env.PATH;
+        await run(`window.desktop.input([...terminals.keys()][0], ${JSON.stringify(`"${fakeAgy}"\r`)})`);
+        await waitFor("document.querySelector('.pane-model-label').textContent === 'Gemini 4 Neon (Medium)'");
+        await run("document.querySelector('.pane-model-btn').click()");
+        await waitFor("Boolean(document.querySelector('.model-option[data-model-id=neon-medium]'))");
+        assert.equal(await run("document.querySelectorAll('.model-option').length"), 1);
+        assert.equal(await run("document.querySelector('.model-option').textContent"), 'Gemini 4 Neon');
+        assert.equal(await run("document.querySelector('.model-effort').hidden"), false);
+        assert.equal(await run("document.querySelector('.model-effort input').max"), '1');
+        await run("const slider = document.querySelector('.model-effort input'); slider.value = '1'; slider.dispatchEvent(new Event('input')); slider.dispatchEvent(new Event('change'));");
+        await waitFor("document.querySelector('.pane-model-label').textContent === 'Gemini 4 Neon (High)'");
+        assert.equal(await run("document.querySelector('.model-effort-label strong').textContent"), 'High');
+        await run('closeModelPopover()');
+        await run("window.desktop.input([...terminals.keys()][0], '\\u0003')");
+        await waitFor("document.querySelector('.pane-model-btn').hidden");
+      }
       await run("window.desktop.input([...terminals.keys()][0], 'echo TERMANAGER_SMOKE_OK\\r')");
       await waitFor("[...terminals.values()][0].term.buffer.active.getLine(0) && Array.from({length: [...terminals.values()][0].term.buffer.active.length}, (_, i) => [...terminals.values()][0].term.buffer.active.getLine(i).translateToString()).filter(line => line.trim() === 'TERMANAGER_SMOKE_OK').length > 0");
       await run("globalThis.controlInput = []; globalThis.controlListener = [...terminals.values()][0].term.onData(data => controlInput.push(data)); [...terminals.values()][0].term.focus()");
@@ -77,7 +118,7 @@ app.on('browser-window-created', (_event, window) => {
       await run("act(() => update(s => { s.panes = {home: []}; s.projects = []; s.selected = 'home'; }))()");
       await waitFor('terminals.size === 0');
       assert.equal(await run("document.getElementById('error').hidden"), true);
-      console.log('PASS: real PTY, shell switching/restart, Ctrl+C, platform shortcuts, renderer isolation, workspace restore and persistence');
+      console.log('PASS: real PTY, drop autorun, grouped models/reasoning slider, agy catalog/status/model changes, shell switching/restart, Ctrl+C, platform shortcuts, renderer isolation, workspace restore and persistence');
       clearTimeout(timeout); window.destroy();
       // shortcut: leave the temporary profile because Windows locks it until exit; add parent cleanup for frequent runs.
       app.exit(0);

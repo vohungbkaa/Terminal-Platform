@@ -44,7 +44,7 @@ test('workspace round trip, paths with Unicode and spaces, task shares project c
     const state = model.defaults();
     const projectPath = path.join(directory, 'Dự án của tôi');
     state.projects.push({ id: 'project-1', name: 'Dự án', path: projectPath, tasks: [{ id: 'task-1', name: 'codex' }] });
-    state.panes['task-1'] = [{ id: 'pane-1', name: 'Terminal', hidden: true }];
+    state.panes['task-1'] = [{ id: 'pane-1', name: 'Terminal', hidden: true, agent: 'codex', model: 'gpt-5.4' }];
     state.selected = 'task-1';
     model.save(file, state);
     assert.deepEqual(model.load(file), state);
@@ -75,6 +75,8 @@ test('invalid state never overwrites the last valid workspace', () => {
     rejects(s => { s.projects = [{ id: 'home', name: 'X', path: directory, tasks: [] }]; });
     rejects(s => { s.projects = [{ id: 'p', name: 'X', path: 'relative', tasks: [] }]; });
     rejects(s => { s.panes.home = [{ id: 'x', name: 'X', hidden: false }, { id: 'x', name: 'X', hidden: false }]; });
+    rejects(s => { s.panes.home = [{ id: 'x', name: 'X', hidden: false, model: '   ' }]; });
+    rejects(s => { s.panes.home = [{ id: 'x', name: 'X', hidden: false, agent: 'a'.repeat(41) }]; });
     assert.throws(() => model.entityPath(state, 'missing', directory));
     assert.throws(() => model.findPane(state, 'missing'));
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
@@ -88,4 +90,27 @@ test('missing workspace uses defaults; corrupt data is reported and preserved', 
     assert.throws(() => model.load(file));
     assert.equal(fs.readFileSync(file, 'utf8'), '{corrupt');
   } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+test('detectAgentFromArgs identifies running agent binaries and ignores non-agent commands', () => {
+  assert.deepEqual(model.detectAgentFromArgs('claude --dangerously-skip-permissions'), { agent: 'claude', model: null });
+  assert.deepEqual(model.detectAgentFromArgs('node /Users/dev/.nvm/versions/node/v24/bin/claude --model opus'), { agent: 'claude', model: 'opus' });
+  assert.deepEqual(model.detectAgentFromArgs('node /tmp/my folder/dự án/claude'), { agent: 'claude', model: null });
+  assert.deepEqual(model.detectAgentFromArgs('/Users/dev/.local/bin/codex --model=gpt-5.4'), { agent: 'codex', model: 'gpt-5.4' });
+  assert.deepEqual(model.detectAgentFromArgs('npx @google/gemini-cli -m gemini-2.5-pro'), { agent: 'gemini', model: 'gemini-2.5-pro' });
+  assert.deepEqual(model.detectAgentFromArgs('/Users/dev/.local/bin/agy'), { agent: 'agy', model: null });
+  assert.equal(model.detectAgentFromArgs('/bin/zsh -l'), null);
+  assert.equal(model.detectAgentFromArgs('vim claude.md'), null);
+  assert.equal(model.detectAgentFromArgs('echo codex'), null);
+  assert.equal(model.detectAgentFromArgs('grep gemini README.md'), null);
+});
+
+
+test('parseAgentModels reads the CLI catalog and ignores notices and malformed entries', () => {
+  assert.deepEqual(model.parseAgentModels('Fetching available models...\n' +
+    'gemini-4-neon-medium\tGemini 4 Neon (Medium)\r\n' +
+    'claude-opus-5-5-high\tClaude Opus 5.5 (High)\n' +
+    'bad id\tInvalid\ninvalid\tLabel\tExtra\n'), [
+    { id: 'gemini-4-neon-medium', label: 'Gemini 4 Neon (Medium)' },
+    { id: 'claude-opus-5-5-high', label: 'Claude Opus 5.5 (High)' }
+  ]);
 });

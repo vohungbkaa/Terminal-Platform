@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   load: () => ipcRenderer.invoke('workspace:load'),
+  agentModels: agent => ipcRenderer.invoke('agent:models', agent),
   save: state => ipcRenderer.invoke('workspace:save', state),
   copy: data => ipcRenderer.invoke('clipboard:copy', data),
   paste: () => ipcRenderer.invoke('clipboard:paste'),
@@ -18,5 +19,10 @@ contextBridge.exposeInMainWorld('desktop', {
     const listener = (_event, id, code) => callback(id, code);
     ipcRenderer.on('terminal:exit', listener);
     return () => ipcRenderer.removeListener('terminal:exit', listener);
+  },
+  onAgent: callback => {
+    const listener = (_event, id, agent, model) => callback(id, agent, model);
+    ipcRenderer.on('terminal:agent', listener);
+    return () => ipcRenderer.removeListener('terminal:agent', listener);
   }
 });
