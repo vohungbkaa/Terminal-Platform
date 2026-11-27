@@ -1,0 +1,24 @@
+README.md
+  h_84f3d158cfb87f 27,33-35
+build-mac.sh
+  h_84f3d158cfb87f 12,17,21,23,42-48
+model.cjs
+  h_84f3d158cfb87f 8-16,21,76-80,86-89
+package.json
+  h_84f3d158cfb87f 31
+renderer.js
+  h_84f3d158cfb87f 420-447,451-453,457-459,461,463,697-719,721-762,965-968,975-979
+styles.css
+  h_84f3d158cfb87f 1192-1249
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f0fad9c0ec268d51e6b13c98c0e6694e11bb82da",
+  "prompts": {},
+  "humans": {
+    "h_84f3d158cfb87f": {
+      "author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
