@@ -19,7 +19,25 @@ Windows dùng Windows PowerShell, PowerShell 7 hoặc CMD. PowerShell 7 cần đ
 
 `postinstall` sửa quyền thực thi của `spawn-helper` trong prebuild node-pty trên Mac. Bước này cần cho shell hoạt động sau khi cài dependencies và trong ứng dụng đóng gói. Không cần thêm dependency.
 
-## Đóng gói
+## Build và cài đặt nhanh trên macOS
+
+Dự án đã có script tự động [build-mac.sh](build-mac.sh) giúp build, đóng app cũ và cài đặt đè trực tiếp vào `/Applications/TerManager-Platform.app`:
+
+```sh
+# Build, cài đặt vào /Applications và tự động mở app
+./build-mac.sh
+
+# Chạy toàn bộ test (unit, smoke, unicode) trước khi build & cài đặt
+./build-mac.sh --test
+
+# Chỉ build ra thư mục dist/, không ghi đè vào /Applications
+./build-mac.sh --no-install
+
+# Cài đặt vào /Applications nhưng không tự mở ứng dụng
+./build-mac.sh --no-open
+```
+
+## Đóng gói thủ công
 
 Build cho hệ điều hành/kiến trúc của máy hiện tại:
 
@@ -67,17 +85,31 @@ Workflow `Desktop builds` trong `.github/workflows/desktop.yml` chạy riêng tr
 
 Đưa thư mục `TerManager-Platform` lên repository GitHub riêng rồi mở **Actions → Desktop builds → Run workflow**. Tải artifact `TerManager-Platform-<OS>-<ARCH>` của job thành công. Workflow cũng chạy khi push hoặc mở PR; không tự phát hành release.
 
-## Chức năng
+## Chức năng & Giao diện
 
-- Thêm thư mục project; tạo, đổi tên và xóa task. Task dùng thư mục của project.
-- Tối đa 9 terminal mỗi workspace, bố cục tự chia từ 1×1 đến 3×3.
-- Đổi tên, ẩn/khôi phục, phóng to, khởi động lại và đóng terminal.
-- Giữ phiên shell và nội dung khi chuyển project/task hoặc ẩn terminal.
-- Lệnh agent `agy`, `codex`, `claude`, `gemini` và lệnh tùy chỉnh. CLI cần được cài riêng và có trong PATH.
-- Bấm lệnh để mở terminal mới và chạy; kéo lệnh vào terminal để chèn rồi nhấn Enter. Task trùng tên lệnh sẽ mở terminal chạy lệnh đó.
-- Bốn giao diện, cỡ chữ terminal 9–32.
-- Windows: `Ctrl+T` thêm terminal, `Ctrl+\` ẩn/hiện sidebar, `Ctrl+,` mở thiết lập; `Ctrl+Shift+C/V` copy/paste terminal.
-- Mac: dùng `Cmd+T`, `Cmd+\`, `Cmd+,` và `Cmd+C/V`. `Ctrl+C` vẫn ngắt lệnh trong terminal.
+Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / Glass & Graphite của dự án `TerManager`:
+
+- **Thanh tiêu đề & Cửa sổ macOS**: Titlebar ẩn viền (`hiddenInset`), căn lề chuẩn nút đèn giao thông (traffic lights) của macOS, giữ nguyên viền tiêu đề chuẩn trên Windows.
+- **Thanh bên (Sidebar) kiểu Arc / Linear**:
+  - Hỗ trợ kéo thay đổi chiều rộng sidebar qua thanh chia hairline mỏng.
+  - Tự động hiển thị ô lọc nhanh khi có từ 4 dự án trở lên.
+  - Cây danh mục dự án & task có hướng dẫn đường kẻ dọc (tree-guide), icon phân loại SVG trực quan (`sparkles` cho AI tasks, `terminal` cho terminal tasks), đếm số lượng terminal đang chạy, thao tác sửa/xóa/thêm hiện mượt mà khi hover.
+  - Thanh footer gắn bộ 4 chấm chọn giao diện nhanh (Theme Swatches) cùng nút mở Thiết lập.
+- **Không gian khởi chạy (Developer Launchpad)**: Khi một workspace chưa có terminal nào, hiển thị màn hình Launchpad với hiệu ứng radial glow, các thẻ thao tác nhanh (**Mở Terminal**, **Chia đôi màn hình**), các nút AI CLI (`agy`, `codex`, `claude`, `gemini`), và hỗ trợ kéo thả lệnh hoặc thư mục trực tiếp vào.
+- **Lưới Terminal & Phóng to (Zoom / Focus Mode)**:
+  - Tối đa 9 terminal mỗi workspace, bố cục tự chia từ 1×1 đến 3×3.
+  - Header pane siêu mảnh 28px với đèn trạng thái phiên shell, nút thu phóng (Zoom), ẩn xuống thanh trạng thái, khởi động lại và đóng.
+  - Khi phóng to 1 pane, terminal pane chiếm toàn bộ khung nhìn mà không ngắt tiến trình ngầm của các pane còn lại; thanh topbar hiện nút thuốc nhộng **Thoát phóng to** để quay lại lưới.
+- **Thanh trạng thái dưới đáy (Status Bar 26px)**:
+  - Hiển thị đường dẫn thư mục hiện tại với nút 1-click sao chép đường dẫn (kèm phản hồi icon checkmark).
+  - Khay Dock các terminal đang ẩn chạy ngầm (Hidden Panes) dạng capsule giúp khôi phục nhanh mà không làm nhảy bố cục.
+  - Hiển thị badge tỉ lệ lưới hiện tại (`1×1`, `1×2`, `2×2`...) và nhãn shell đang dùng.
+- **Bảng lệnh Agent (Drawer kính mờ)**: Bảng lệnh trượt nổi bên phải, hỗ trợ kéo thả lệnh vào bất kỳ terminal nào hoặc bấm để mở ngay terminal mới.
+- **Bảng Thiết Lập (Settings Slide-over)**: Dạng panel kính mờ trượt từ cạnh phải, gồm bộ thẻ preview trực quan cho 4 theme màu, thanh trượt cỡ chữ có live preview dòng lệnh và chọn shell mặc định.
+- **Hệ thống 4 Theme màu sắc**: Graphite, Obsidian, Warm Dusk, Nord Frost đồng bộ chính xác token màu và bảng màu 16-ANSI với `Theme.swift`.
+- **Phím tắt chuẩn Desktop**:
+  - Windows: `Ctrl+T` thêm terminal, `Ctrl+\` ẩn/hiện sidebar, `Ctrl+,` mở thiết lập; `Ctrl+Shift+C/V` copy/paste terminal.
+  - Mac: `Cmd+T`, `Cmd+\`, `Cmd+,` và `Cmd+C/V`. `Ctrl+C` vẫn ngắt lệnh (SIGINT) chuẩn trong shell.
 
 ## Nhập tiếng Việt trên Mac
 

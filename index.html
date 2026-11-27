@@ -13,20 +13,275 @@
 </head>
 <body>
   <aside id="sidebar" aria-label="Projects">
-    <div class="brand"><span class="logo">❯_</span><div>TerManager-Platform<small id="platform-label"></small></div></div>
-    <div class="section-title">WORKSPACES <button id="add-project" title="Thêm thư mục project" aria-label="Thêm project">＋</button></div>
+    <div class="sidebar-header">
+      <div class="sidebar-title">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="2" y="2" width="5" height="5" rx="1.2"/>
+          <rect x="9" y="2" width="5" height="5" rx="1.2"/>
+          <rect x="2" y="9" width="5" height="5" rx="1.2"/>
+          <rect x="9" y="9" width="5" height="5" rx="1.2"/>
+        </svg>
+        <span>Workspaces</span>
+      </div>
+      <div class="sidebar-header-actions">
+        <button id="add-project" class="icon-btn" title="Thêm thư mục dự án" aria-label="Thêm project">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M8 3.2v9.6M3.2 8h9.6"/></svg>
+        </button>
+        <button id="collapse-sidebar" class="icon-btn" title="Thu gọn Sidebar" aria-label="Thu gọn sidebar">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.5" width="12.4" height="11" rx="2"/><path d="M5.8 2.5v11"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="project-filter-wrap" class="filter-wrap" hidden>
+      <svg class="icon filter-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4 14 14"/></svg>
+      <input id="project-filter" type="search" placeholder="Lọc dự án..." aria-label="Lọc dự án">
+      <button id="clear-filter" type="button" class="filter-clear" hidden aria-label="Xóa bộ lọc">×</button>
+    </div>
+
     <nav id="projects"></nav>
-    <div class="sidebar-footer"><button id="settings-button">⚙ Thiết lập</button><span id="shell-label"></span></div>
+
+    <div class="sidebar-footer">
+      <div id="theme-swatches" class="theme-swatches" role="group" aria-label="Chọn giao diện nhanh"></div>
+      <button id="settings-button" class="icon-btn" title="Thiết lập & Giao diện" aria-label="Thiết lập & Giao diện">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="2.3"/>
+          <path d="M13.2 9.7a1.1 1.1 0 0 0 .22 1.21l.04.04a1.33 1.33 0 1 1-1.88 1.88l-.04-.04a1.1 1.1 0 0 0-1.21-.22 1.1 1.1 0 0 0-.67 1.01v.11a1.33 1.33 0 1 1-2.66 0v-.06a1.1 1.1 0 0 0-.72-1.01 1.1 1.1 0 0 0-1.21.22l-.04.04a1.33 1.33 0 1 1-1.88-1.88l.04-.04a1.1 1.1 0 0 0 .22-1.21 1.1 1.1 0 0 0-1.01-.67h-.11a1.33 1.33 0 1 1 0-2.66h.06a1.1 1.1 0 0 0 1.01-.72 1.1 1.1 0 0 0-.22-1.21l-.04-.04a1.33 1.33 0 1 1 1.88-1.88l.04.04a1.1 1.1 0 0 0 1.21.22h.05a1.1 1.1 0 0 0 .67-1.01v-.11a1.33 1.33 0 1 1 2.66 0v.06a1.1 1.1 0 0 0 .67 1.01 1.1 1.1 0 0 0 1.21-.22l.04-.04a1.33 1.33 0 1 1 1.88 1.88l-.04.04a1.1 1.1 0 0 0-.22 1.21v.05a1.1 1.1 0 0 0 1.01.67h.11a1.33 1.33 0 1 1 0 2.66h-.06a1.1 1.1 0 0 0-1.01.67Z"/>
+        </svg>
+      </button>
+    </div>
   </aside>
+
+  <div id="sidebar-resizer" class="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Thay đổi chiều rộng sidebar"></div>
+
   <main>
-    <header><button id="toggle-sidebar" title="Ẩn/hiện sidebar (Ctrl+\)" aria-label="Ẩn/hiện sidebar">☰</button><div class="breadcrumb"><strong id="workspace-title">Terminal</strong><small id="workspace-path"></small></div><button id="commands-button">Lệnh agent</button><button id="new-terminal" class="primary">＋ Terminal</button></header>
-    <div id="terminal-grid"></div>
-    <div id="empty"><span class="empty-icon">❯_</span><h1>Không gian làm việc của bạn</h1><p>Mở terminal tại thư mục project. Mỗi workspace có tối đa 9 terminal.</p><button id="empty-new" class="primary">Mở Terminal · Ctrl+T</button></div>
-    <footer><span id="status"></span><div id="hidden-panes"></div><span id="settings-shortcut"></span></footer>
+    <header id="topbar">
+      <button id="toggle-sidebar" class="icon-btn" title="Ẩn/hiện sidebar (Ctrl+\)" aria-label="Ẩn/hiện sidebar">
+        <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.5" width="12.4" height="11" rx="2"/><path d="M5.8 2.5v11"/></svg>
+      </button>
+
+      <div class="breadcrumb">
+        <span id="workspace-icon" class="workspace-badge-icon" aria-hidden="true"></span>
+        <strong id="workspace-title">Home</strong>
+        <span id="workspace-sub" class="breadcrumb-sub" hidden></span>
+        <small id="workspace-path"></small>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="exit-zoom" type="button" class="zoom-pill" hidden title="Quay lại chế độ lưới">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2v4H2M10 14v-4h4M14 6h-4V2M2 10h4v4"/></svg>
+          <span>Thoát phóng to</span>
+        </button>
+
+        <button id="new-terminal" class="theme-btn compact" title="Mở thêm Terminal mới">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.2v9.6M3.2 8h9.6"/></svg>
+          <span>Split</span>
+        </button>
+
+        <button id="commands-button" class="icon-btn" title="Bảng lệnh Agent" aria-label="Lệnh agent">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M9.3 1.5 3.6 8.8a.4.4 0 0 0 .32.65h3.5l-.72 5.05a.35.35 0 0 0 .62.27l5.7-7.3a.4.4 0 0 0-.32-.65H9.2l.72-5.05a.35.35 0 0 0-.62-.27Z"/></svg>
+        </button>
+
+        <button id="topbar-settings" class="icon-btn" hidden title="Thiết lập & Giao diện" aria-label="Thiết lập">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="8" cy="8" r="2.3"/>
+            <path d="M13.2 9.7a1.1 1.1 0 0 0 .22 1.21l.04.04a1.33 1.33 0 1 1-1.88 1.88l-.04-.04a1.1 1.1 0 0 0-1.21-.22 1.1 1.1 0 0 0-.67 1.01v.11a1.33 1.33 0 1 1-2.66 0v-.06a1.1 1.1 0 0 0-.72-1.01 1.1 1.1 0 0 0-1.21.22l-.04.04a1.33 1.33 0 1 1-1.88-1.88l.04-.04a1.1 1.1 0 0 0 .22-1.21 1.1 1.1 0 0 0-1.01-.67h-.11a1.33 1.33 0 1 1 0-2.66h.06a1.1 1.1 0 0 0 1.01-.72 1.1 1.1 0 0 0-.22-1.21l-.04-.04a1.33 1.33 0 1 1 1.88-1.88l.04.04a1.1 1.1 0 0 0 1.21.22h.05a1.1 1.1 0 0 0 .67-1.01v-.11a1.33 1.33 0 1 1 2.66 0v.06a1.1 1.1 0 0 0 .67 1.01 1.1 1.1 0 0 0 1.21-.22l.04-.04a1.33 1.33 0 1 1 1.88 1.88l-.04.04a1.1 1.1 0 0 0-.22 1.21v.05a1.1 1.1 0 0 0 1.01.67h.11a1.33 1.33 0 1 1 0 2.66h-.06a1.1 1.1 0 0 0-1.01.67Z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="stage-body">
+      <div id="terminal-grid"></div>
+
+      <div id="empty" class="launchpad">
+        <div class="launchpad-glow" aria-hidden="true"></div>
+        <div class="launchpad-content">
+          <div class="launchpad-identity">
+            <div id="launchpad-icon" class="launchpad-icon" aria-hidden="true"></div>
+            <h1 id="launchpad-title">Home Terminal</h1>
+            <p id="launchpad-path" class="launchpad-path">~</p>
+          </div>
+
+          <div class="launchpad-cards">
+            <button id="empty-new" type="button" class="launch-card primary-card">
+              <span class="launch-card-icon accent">
+                <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6.8 8 3 11.5M8.2 11.5H13"/></svg>
+              </span>
+              <span class="launch-card-text">
+                <strong>Mở Terminal</strong>
+                <small id="empty-new-sub">1 cửa sổ • Ctrl+T</small>
+              </span>
+            </button>
+
+            <button id="empty-split" type="button" class="launch-card">
+              <span class="launch-card-icon info">
+                <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.8" y="2.5" width="12.4" height="11" rx="2"/><path d="M8 2.5v11"/></svg>
+              </span>
+              <span class="launch-card-text">
+                <strong>Chia đôi màn hình</strong>
+                <small>2 terminal song song</small>
+              </span>
+            </button>
+          </div>
+
+          <div class="launchpad-agents-wrap">
+            <div class="launchpad-section-label">KHỞI CHẠY NHANH AI AGENT</div>
+            <div id="launchpad-agents" class="launchpad-agents"></div>
+          </div>
+
+          <p id="launchpad-tip" class="launchpad-tip">Mẹo: Kéo lệnh Agent từ thanh bên vào đây để mở nhanh</p>
+        </div>
+      </div>
+
+      <div id="agent-hover-trigger" class="edge-hover-trigger right" title="Di chuột vào đây để mở bảng lệnh Agent" aria-hidden="true">
+        <div class="edge-pill">
+          <svg class="icon" viewBox="0 0 16 16" fill="currentColor"><path d="M9.3 1.5 3.6 8.8a.4.4 0 0 0 .32.65h3.5l-.72 5.05a.35.35 0 0 0 .62.27l5.7-7.3a.4.4 0 0 0-.32-.65H9.2l.72-5.05a.35.35 0 0 0-.62-.27Z"/></svg>
+        </div>
+      </div>
+
+      <aside id="commands-panel" aria-label="Agent Commands">
+        <div class="drawer-header">
+          <div class="drawer-title">
+            <svg class="icon accent-icon" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M9.3 1.5 3.6 8.8a.4.4 0 0 0 .32.65h3.5l-.72 5.05a.35.35 0 0 0 .62.27l5.7-7.3a.4.4 0 0 0-.32-.65H9.2l.72-5.05a.35.35 0 0 0-.62-.27Z"/></svg>
+            <h2>Agent Commands</h2>
+          </div>
+          <div class="drawer-header-actions">
+            <button id="add-command" class="icon-btn small" title="Thêm lệnh mới" aria-label="Thêm lệnh">
+              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.2v9.6M3.2 8h9.6"/></svg>
+            </button>
+            <button id="pin-commands" class="icon-btn small" title="Ghim cố định bảng lệnh" aria-label="Ghim cố định bảng lệnh">
+              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.45" stroke-linecap="round" stroke-linejoin="round"><path d="M9.8 2.2 13.8 6.2l-1.3 1.3-.9-.2-2.7 2.7.2 1.7-1.1 1.1-2.5-2.5-3.2 3.2M5.7 10.3 3.2 7.8l1.1-1.1 1.7.2 2.7-2.7-.2-.9 1.3-1.1Z"/></svg>
+            </button>
+            <button id="close-commands" class="icon-btn small" title="Đóng bảng lệnh" aria-label="Đóng danh sách lệnh">
+              <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            </button>
+          </div>
+        </div>
+        <div id="commands" class="drawer-list"></div>
+        <div class="drawer-footer">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 6.5 7l2.5 2.5L13 5.5"/><path d="M9.5 5.5H13V9"/></svg>
+          <span>Kéo thả vào Terminal để chạy</span>
+        </div>
+      </aside>
+    </div>
+
+    <footer id="statusbar">
+      <div class="status-left">
+        <span class="status-path-wrap" title="Đường dẫn hiện tại">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.4 1.6h4.6A1.5 1.5 0 0 1 14 6.1v5.4a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Z"/></svg>
+          <span id="status-path" class="mono">~</span>
+        </span>
+        <button id="copy-path" type="button" class="status-icon-btn" title="Sao chép đường dẫn" aria-label="Sao chép đường dẫn">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="5.5" y="5.5" width="8" height="8" rx="1.4"/><path d="M10.5 5.5V3.9A1.4 1.4 0 0 0 9.1 2.5H3.9A1.4 1.4 0 0 0 2.5 3.9v5.2a1.4 1.4 0 0 0 1.4 1.4h1.6"/></svg>
+        </button>
+        <div id="hidden-panes-divider" class="status-divider" hidden></div>
+        <div id="hidden-panes"></div>
+      </div>
+
+      <div class="status-right">
+        <span id="grid-badge" class="status-metric mono" hidden></span>
+        <span id="status" class="status-metric mono">0 đang hiện · 0/9 terminal</span>
+        <span id="shell-label" class="status-pill mono"></span>
+        <span id="settings-shortcut" class="status-shortcut" hidden></span>
+      </div>
+    </footer>
   </main>
-  <aside id="commands-panel" hidden aria-label="Lệnh agent"><div class="panel-heading"><h2>Lệnh agent</h2><button id="close-commands" aria-label="Đóng danh sách lệnh">×</button></div><p>Bấm lệnh để mở terminal mới. Kéo lệnh vào terminal để chèn, sau đó nhấn Enter để chạy.</p><div id="commands"></div><button id="add-command">＋ Thêm lệnh</button></aside>
-  <dialog id="settings-dialog"><form id="settings-form"><h2>Thiết lập</h2><label>Shell cho terminal mới<select id="shell"></select></label><label>Cỡ chữ terminal<input id="font-size" type="number" min="9" max="32" required></label><label>Giao diện<select id="theme"><option value="graphite">Graphite</option><option value="obsidian">Obsidian</option><option value="warmDusk">Warm Dusk</option><option value="nordFrost">Nord Frost</option></select></label><p>Đổi workspace giữ nguyên phiên terminal. Khi mở lại ứng dụng, bố cục được khôi phục; lệnh cũ không tự chạy lại.</p><div class="dialog-actions"><button type="button" id="cancel-settings">Hủy</button><button class="primary">Lưu</button></div></form></dialog>
-  <dialog id="text-dialog"><form id="text-form"><h2 id="text-title"></h2><label id="text-label">Tên<input id="text-value" maxlength="200" required></label><label id="command-label" hidden>Lệnh<input id="command-value" maxlength="4096"></label><div class="dialog-actions"><button type="button" id="cancel-text">Hủy</button><button class="primary">Lưu</button></div></form></dialog>
-  <div id="error" role="alert" hidden><span></span><button id="dismiss-error" aria-label="Đóng thông báo">×</button></div>
+
+  <dialog id="settings-dialog" class="settings-sheet">
+    <form id="settings-form" class="sheet-layout">
+      <div class="sheet-header">
+        <div class="sheet-header-left">
+          <div class="sheet-icon-box" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 4.5h11M2.5 8h11M2.5 11.5h11"/><circle cx="5.5" cy="4.5" r="1.4" fill="currentColor"/><circle cx="10.5" cy="8" r="1.4" fill="currentColor"/><circle cx="6.5" cy="11.5" r="1.4" fill="currentColor"/></svg>
+          </div>
+          <div>
+            <h2>Thiết Lập &amp; Giao Diện</h2>
+            <p class="sheet-subtitle">Đồng bộ giao diện và màu Terminal</p>
+          </div>
+        </div>
+        <button type="button" id="cancel-settings" class="icon-btn" title="Đóng (ESC)" aria-label="Đóng">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+      </div>
+
+      <div class="sheet-body">
+        <section class="settings-section">
+          <div class="settings-section-title">GIAO DIỆN &amp; BẢNG MÀU</div>
+          <div id="theme-cards" class="theme-grid"></div>
+          <select id="theme" class="sr-only" aria-label="Giao diện">
+            <option value="graphite">Graphite</option>
+            <option value="obsidian">Obsidian</option>
+            <option value="warmDusk">Warm Dusk</option>
+            <option value="nordFrost">Nord Frost</option>
+          </select>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-title">CỠ CHỮ TERMINAL</div>
+          <div class="settings-card">
+            <div class="font-slider-row">
+              <span class="font-size-a small">A</span>
+              <input id="font-size-slider" type="range" min="9" max="24" step="1" aria-label="Thanh trượt cỡ chữ">
+              <span class="font-size-a large">A</span>
+              <input id="font-size" type="number" min="9" max="32" required class="font-size-input mono" aria-label="Cỡ chữ terminal">
+              <span class="font-unit mono">pt</span>
+            </div>
+            <div id="font-size-preview" class="font-preview mono">$ echo "Terminal Manager"  # 13pt</div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-title">SHELL MẶC ĐỊNH</div>
+          <div class="settings-card">
+            <label class="field-label" for="shell">Shell cho terminal mới</label>
+            <select id="shell"></select>
+            <p class="field-hint">Đổi workspace giữ nguyên phiên terminal. Khi mở lại ứng dụng, bố cục được khôi phục; lệnh cũ không tự chạy lại.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="sheet-footer">
+        <div class="sheet-brand">
+          <strong>TerManager-Platform</strong>
+          <small id="platform-label"></small>
+        </div>
+        <div class="sheet-footer-actions">
+          <button type="button" id="cancel-settings-btn" class="theme-btn compact">Hủy</button>
+          <button type="submit" class="theme-btn primary compact">Lưu</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="text-dialog" class="modal-dialog">
+    <form id="text-form" class="modal-layout">
+      <div class="modal-header">
+        <h2 id="text-title"></h2>
+        <button type="button" id="close-text-x" class="icon-btn small" aria-label="Đóng">
+          <svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <label id="text-label" class="modal-field">
+          <span>TÊN HIỂN THỊ</span>
+          <input id="text-value" maxlength="200" required>
+        </label>
+        <label id="command-label" class="modal-field" hidden>
+          <span>LỆNH TERMINAL</span>
+          <input id="command-value" maxlength="4096" class="mono">
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" id="cancel-text" class="theme-btn compact">Hủy</button>
+        <button type="submit" class="theme-btn primary compact">Lưu</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="error" role="alert" hidden>
+    <span></span>
+    <button id="dismiss-error" class="icon-btn small" aria-label="Đóng thông báo">×</button>
+  </div>
 </body>
 </html>

@@ -1,0 +1,14 @@
+<component name="libraryTable">
+  <library name="dist">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/dist/TerManager-Platform-1.0.1-mac-arm64.zip!/" />
+      <root url="jar://$PROJECT_DIR$/dist/TerManager-Platform-source.zip!/" />
+      <root url="jar://$PROJECT_DIR$/dist/Terminal-Manager-Windows-x64-source.zip!/" />
+      <root url="jar://$PROJECT_DIR$/dist/Terminal-Manager-1.0.0-win-x64.zip!/" />
+      <root url="jar://$PROJECT_DIR$/dist/TerManager-Platform-1.0.0-win-x64.zip!/" />
+      <root url="jar://$PROJECT_DIR$/dist/TerManager-Platform-1.0.0-mac-arm64.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

@@ -49,6 +49,7 @@ else {
     window = new BrowserWindow({
       title: 'TerManager-Platform', width: 1440, height: 900, minWidth: 900, minHeight: 580,
       backgroundColor: '#0e1015',
+      ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 13 } } : {}),
       webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
     });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
