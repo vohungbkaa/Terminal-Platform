@@ -1,0 +1,38 @@
+test/model.test.cjs
+  s_7304d540f07e03::t_d2531fa5140ae4 8-23
+  s_7304d540f07e03::t_db27b9ae168039 7
+model.cjs
+  s_7304d540f07e03::t_88a86228bd7896 104-114,192
+main.cjs
+  s_7304d540f07e03::t_d2531fa5140ae4 173-178
+README.md
+  s_7304d540f07e03::t_a2439431fc0b39 97-98
+preload.cjs
+  s_7304d540f07e03::t_d2531fa5140ae4 9
+styles.css
+  s_7304d540f07e03::t_88a86228bd7896 189
+  s_7304d540f07e03::t_1112a8e4a02c21 223,231-232,234
+index.html
+  s_7304d540f07e03::t_88a86228bd7896 27-29
+renderer.js
+  s_7304d540f07e03::t_88a86228bd7896 1461,1473-1483,1644
+  s_7304d540f07e03::t_d2531fa5140ae4 1484-1485
+test/smoke.cjs
+  s_7304d540f07e03::t_1112a8e4a02c21 2,31-35,204-231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a15f5bf3ed167b76479b63241e6aa38911757b34",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
