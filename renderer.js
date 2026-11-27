@@ -5,11 +5,13 @@ let state, home, platform, maximized = null, actionQueue = Promise.resolve();
 let projectFilter = '';
 let agentDrawerVisible = false;
 let agentDrawerPinned = false;
+let agentDrawerAutoPane = null;
 let isHoveringAgentTrigger = false;
 let isHoveringAgentDrawer = false;
 let agentHideTimer = null;
 const collapsedProjects = new Set();
 const terminals = new Map();
+const pendingAgentLaunches = new Set();
 let activeModelPopover = null;
 
 // Exact 4 curated themes synced from native TerManager (Theme.swift)
@@ -423,31 +425,15 @@ function render() {
 const AGENT_MODELS = {
   claude: {
     key: 'claude', name: 'Claude Code', tint: '#e59853', icon: ICONS.sparkles,
-    models: [
-      { id: 'sonnet', label: 'Sonnet' },
-      { id: 'opus', label: 'Opus' },
-      { id: 'haiku', label: 'Haiku' },
-      { id: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
-      { id: 'claude-opus-4-1', label: 'Opus 4.1' }
-    ]
+    models: [], nativePicker: true
   },
   codex: {
     key: 'codex', name: 'Codex', tint: '#38bdf8', icon: ICONS.terminal,
-    models: [
-      { id: 'gpt-5.4', label: 'GPT-5.4' },
-      { id: 'gpt-5.3-codex', label: 'GPT-5.3 Codex' },
-      { id: 'gpt-5.2-codex', label: 'GPT-5.2 Codex' },
-      { id: 'o3', label: 'o3' },
-      { id: 'o4-mini', label: 'o4-mini' }
-    ]
+    models: []
   },
   gemini: {
     key: 'gemini', name: 'Gemini', tint: '#a78bfa', icon: ICONS.sparkles,
-    models: [
-      { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite' }
-    ]
+    models: [], nativePicker: true
   },
   agy: {
     key: 'agy', name: 'Antigravity', tint: '#5e9bff', icon: ICONS.bolt,
@@ -476,32 +462,116 @@ function agyModelFromStatus(lines, models) {
   for (const line of [...lines].reverse()) {
     if (!line.includes('? for shortcuts')) continue;
     const found = models.find(item => line.trimEnd().endsWith(
-      item.label.replace(/ \((Low|Medium|High|XHigh|Max)\)$/, (_, effort) => ` · ${effort.toLowerCase()}`)
+      item.label.replace(/ \((None|Minimal|Low|Medium|High|XHigh|Max|Ultra)\)$/, (_, effort) => ` · ${effort.toLowerCase()}`)
     ));
     if (found) return found.id;
   }
   return null;
 }
 
-function syncAgyModel(view) {
-  if (view.runningAgent !== 'agy') return;
+function resolveModelName(name, models) {
+  const clean = name.trim();
+  const found = models.find(item => item.id.toLowerCase() === clean.toLowerCase() ||
+    item.label.replace(/ \((None|Minimal|Low|Medium|High|XHigh|Max|Ultra)\)$/, '').toLowerCase() === clean.toLowerCase());
+  return found?.id || clean;
+}
+
+// shortcut: recognize agent UI status, not arbitrary model mentions; hidden/custom footers can leave the model unknown.
+function agentModelFromScreen(agent, lines, models) {
+  lines = lines.slice(0, lines.findLastIndex(line => line.trim()) + 1);
+  const efforts = 'none|minimal|low|medium|high|xhigh|max|ultra|default';
+  if (agent === 'agy') {
+    const model = agyModelFromStatus(lines, models);
+    if (model) {
+      const label = models.find(item => item.id === model)?.label || '';
+      return { model, effort: label.match(/\((\w+)\)$/)?.[1]?.toLowerCase() || null };
+    }
+    if (lines.some(line => line.includes('? for shortcuts') && /\bOrchestrator(?:\s*·.*)?\s*$/.test(line))) {
+      return { model: 'Orchestrator', effort: null };
+    }
+    return null;
+  }
+  const recent = [...lines].reverse();
+  if (agent === 'codex') {
+    if (lines.slice(-6).some(line => line.includes('? for shortcuts'))) {
+      for (const line of recent.slice(0, 8)) {
+        const footer = line.match(new RegExp(`^\\s*([A-Za-z0-9][A-Za-z0-9 ._:/-]{0,150}?)\\s+(${efforts})(?:\\s*\\([^)]*\\))?\\s*[·|]`, 'i'));
+        if (footer) return { model: resolveModelName(footer[1], models), effort: footer[2].toLowerCase() === 'default' ? null : footer[2].toLowerCase() };
+      }
+    }
+    for (const line of recent) {
+      const changed = line.match(new RegExp(`^\\s*[•●]\\s+Model changed to (\\S+)\\s+(${efforts})(?:\\s|$)`, 'i'));
+      if (changed) return { model: resolveModelName(changed[1], models), effort: changed[2].toLowerCase() };
+      const status = line.match(/^\s*[│|]?\s*Model:\s+(.+?)\s*$/i);
+      if (status && lines.some(row => /OpenAI Codex|Model provider:/i.test(row))) {
+        const value = status[1].match(new RegExp(`^(.+?)\\s+\\(reasoning\\s+(${efforts})`, 'i'))
+          || status[1].match(new RegExp(`^(\\S+)(?:\\s+(${efforts}))?`, 'i'));
+        if (value) return { model: resolveModelName(value[1], models), effort: value[2]?.toLowerCase() || null };
+      }
+    }
+  }
+  if (agent === 'claude') {
+    const effortLine = recent.find(line => /\b(low|medium|high|xhigh|max)\s*·\s*\/effort\b/i.test(line));
+    const effort = effortLine?.match(/\b(low|medium|high|xhigh|max)\s*·\s*\/effort\b/i)?.[1].toLowerCase() || null;
+    for (const line of recent) {
+      const changed = line.match(/^\s*⎿\s*(?:Set model to|Kept model as)\s+(.+?)\s*$/i);
+      if (changed) return { model: changed[1], effort };
+    }
+    const header = lines.findLastIndex(line => /Claude Code v\d/.test(line));
+    if (header >= 0) {
+      for (const line of lines.slice(header + 1, header + 4)) {
+        const model = line.replace(/[\u2580-\u259f│]/g, '').trim().match(/^(.+?)\s+·\s+.+$/);
+        if (model) return { model: model[1].trim(), effort };
+      }
+    }
+  }
+  if (agent === 'gemini') {
+    const footer = lines.slice(-6);
+    if (footer.some(line => /(?:no sandbox|untrusted|sandbox|%\s*(?:context|left|used)|Workspace\s+.*Model)/i.test(line))) {
+      for (const line of [...footer].reverse()) {
+        if (/^\s*[>❯›]/.test(line)) continue;
+        const model = line.match(/\b((?:gemini|gemma|auto-gemini)-[\w.-]+|Auto(?: \(Gemini [\d.]+\))?)(?=\s|$|[│|])/);
+        if (model) return { model: model[1], effort: null };
+      }
+    }
+    for (const line of recent) {
+      const changed = line.match(/^\s*(?:[ℹ✓]\s*)?Model set to ([\w.:/-]+)(?:\s+\(persisted\))?\s*$/);
+      if (changed) return { model: changed[1], effort: null };
+    }
+  }
+  return null;
+}
+
+function isCurrentModelVariant(view, variant) {
+  return variant.id === activeModelForView(view) && (view.runningAgent !== 'codex' ||
+    !variant.effort || variant.effort.toLowerCase() === view.detectedEffort);
+}
+
+function syncAgentModel(view) {
+  if (!view.runningAgent) return;
   const buffer = view.term.buffer.active;
-  const lines = Array.from({ length: view.term.rows }, (_, i) => buffer.getLine(buffer.baseY + i)?.translateToString() || '');
-  const detected = agyModelFromStatus(lines, AGENT_MODELS.agy.models);
-  if (detected && detected !== view.detectedModel) {
-    view.detectedModel = detected;
+  const markerLine = view.agentMarker?.line;
+  const floor = view.agentMarkerBuffer === buffer.type && markerLine >= 0 && markerLine <= buffer.baseY + buffer.cursorY
+    ? Math.max(buffer.baseY, markerLine) : buffer.baseY;
+  const lines = Array.from({ length: Math.max(0, buffer.baseY + view.term.rows - floor) }, (_, i) => buffer.getLine(floor + i)?.translateToString() || '');
+  const detected = agentModelFromScreen(view.runningAgent, lines, AGENT_MODELS[view.runningAgent].models);
+  if (detected && (detected.model !== view.detectedModel || detected.effort !== view.detectedEffort)) {
+    view.detectedModel = detected.model;
+    view.detectedEffort = detected.effort;
     updatePaneModelButton(view, findPaneState(view.id));
   }
 }
 
 function groupModelVariants(models) {
   const groups = new Map();
-  const levels = ['Low', 'Medium', 'High', 'XHigh', 'Max'];
+  const levels = ['None', 'Minimal', 'Low', 'Medium', 'High', 'XHigh', 'Max', 'Ultra'];
   for (const model of models) {
-    const match = model.label.match(/^(.*) \((Low|Medium|High|XHigh|Max)\)$/);
+    if (/^gemini-pro-orchestrator(?:-|$)/.test(model.id)) continue;
+    const match = model.label.match(/^(.*) \((None|Minimal|Low|Medium|High|XHigh|Max|Ultra)\)$/i);
     const label = match ? match[1] : model.label;
+    const effort = levels.find(level => level.toLowerCase() === (model.effort || match?.[2] || '').toLowerCase()) || null;
     if (!groups.has(label)) groups.set(label, { label, variants: [] });
-    groups.get(label).variants.push({ ...model, effort: match ? match[2] : null });
+    groups.get(label).variants.push({ ...model, effort });
   }
   for (const group of groups.values()) {
     group.variants.sort((a, b) => levels.indexOf(a.effort) - levels.indexOf(b.effort));
@@ -513,6 +583,8 @@ function modelLabelFor(agentKey, modelId) {
   if (!modelId) return 'Model';
   const group = agentKey && AGENT_MODELS[agentKey];
   const found = group?.models.find(m => m.id === modelId);
+  if (agentKey === 'codex' && found) return found.label.replace(/ \((None|Minimal|Low|Medium|High|XHigh|Max|Ultra)\)$/i, '');
+  if (agentKey === 'agy' && /^gemini-pro-orchestrator(?:-|$)/.test(modelId)) return 'Orchestrator';
   return found ? found.label : modelId;
 }
 
@@ -532,7 +604,8 @@ function updatePaneModelButton(view, pane) {
   view.modelBtn.classList.toggle('has-model', Boolean(activeModel));
   view.modelBtn.classList.toggle('open', activeModelPopover?.paneId === view.id);
   view.modelBtn.style.setProperty('--model-tint', group.tint);
-  view.modelBtn.querySelector('.pane-model-label').textContent = label;
+  view.modelBtn.querySelector('.pane-model-label').textContent = agentKey === 'codex' && view.detectedEffort
+    ? `${label} · ${view.detectedEffort}` : label;
   view.modelBtn.title = activeModel
     ? `${group.name} • Model: ${activeModel} • Nhấn để đổi model`
     : `${group.name} • Chưa xác định model • Nhấn để đổi model (/model)`;
@@ -550,17 +623,38 @@ function closeModelPopover() {
   if (view?.modelBtn) view.modelBtn.classList.remove('open');
 }
 
-async function applyPaneModel(paneId, modelId) {
+async function applyPaneModel(paneId, modelId, effort) {
   const view = terminals.get(paneId);
   if (!view || !view.running || !view.runningAgent) {
     throw new Error('Không có agent nào đang chạy trong terminal này.');
   }
   const cleanModel = (modelId || '').trim();
-  await api.input(paneId, cleanModel ? `/model ${cleanModel}\r` : '/model\r');
+  if (cleanModel.length > 200 || /[\x00-\x1f\x7f]/.test(cleanModel)) throw new Error('Model không hợp lệ.');
+  if (effort && !/^(none|minimal|low|medium|high|xhigh|max|ultra)$/i.test(effort)) throw new Error('Mức reasoning không hợp lệ.');
+  const reasoning = view.runningAgent === 'codex' && cleanModel && effort ? ` --reasoning=${effort.toLowerCase()}` : '';
+  await api.input(paneId, cleanModel ? `/model ${cleanModel}${reasoning}\r` : '/model\r');
   view.term.focus();
 }
 
-async function openModelPopover(paneId, anchorBtn) {
+const agentModelRequests = new Map();
+function loadAgentModels(agent) {
+  const group = AGENT_MODELS[agent];
+  // shortcut: reuse the CLI catalog for this app session; reopen the app to refresh it.
+  if (group.models.length || group.nativePicker) return Promise.resolve(group.models);
+  if (!agentModelRequests.has(agent)) {
+    agentModelRequests.set(agent, api.agentModels(agent).then(models => {
+      if (!models.length) {
+        if (agent !== 'codex') throw new Error(`${group.name} chưa trả về danh sách model. Thử mở lại menu.`);
+        group.nativePicker = true;
+      }
+      group.models = models;
+      return models;
+    }).finally(() => { agentModelRequests.delete(agent); }));
+  }
+  return agentModelRequests.get(agent);
+}
+
+function openModelPopover(paneId, anchorBtn) {
   if (activeModelPopover?.paneId === paneId) {
     closeModelPopover();
     return;
@@ -572,12 +666,9 @@ async function openModelPopover(paneId, anchorBtn) {
   const agentKey = view?.running ? view.runningAgent : null;
   const group = agentKey ? AGENT_MODELS[agentKey] : null;
   if (!pane || !group) return;
-  if (agentKey === 'agy') {
-    try { group.models = await api.agentModels('agy'); }
-    catch (reason) { error(reason); return; }
-    if (terminals.get(paneId) !== view || view.runningAgent !== agentKey || !view.running) return;
-    syncAgyModel(view);
-    closeModelPopover();
+  if (group.nativePicker) {
+    act(() => applyPaneModel(paneId, ''))();
+    return;
   }
 
   const popover = document.createElement('div');
@@ -598,8 +689,6 @@ async function openModelPopover(paneId, anchorBtn) {
     popover.style.top = `${top}px`;
   };
 
-  const currentModel = activeModelForView(view, pane);
-
   const header = document.createElement('div');
   header.className = 'model-popover-header';
   header.style.setProperty('--group-tint', group.tint);
@@ -611,11 +700,16 @@ async function openModelPopover(paneId, anchorBtn) {
 
   const section = document.createElement('div');
   section.className = 'model-group';
+  const loading = !group.models.length;
+  if (loading) {
+    section.textContent = 'Đang tải model…';
+    section.setAttribute('role', 'status');
+  }
 
   const families = groupModelVariants(group.models);
-  let selectedFamily = families.find(item => item.variants.some(v => v.id === currentModel)) || families[0];
-  let selectedVariant = selectedFamily?.variants.find(v => v.id === currentModel)
-    || selectedFamily?.variants.find(v => v.effort === 'Medium') || selectedFamily?.variants[0];
+  let selectedFamily = families.find(item => item.variants.some(v => isCurrentModelVariant(view, v))) || families[0];
+  let selectedVariant = selectedFamily?.variants.find(v => isCurrentModelVariant(view, v))
+    || selectedFamily?.variants.find(v => v.default) || selectedFamily?.variants.find(v => v.effort === 'Medium') || selectedFamily?.variants[0];
 
   const effortControl = document.createElement('div');
   effortControl.className = 'model-effort';
@@ -640,6 +734,7 @@ async function openModelPopover(paneId, anchorBtn) {
       button.setAttribute('aria-checked', String(selected));
     }
     effortControl.hidden = !selectedFamily || selectedFamily.variants.length < 2;
+    applyBtn.disabled = !selectedVariant || isCurrentModelVariant(view, selectedVariant);
     if (!selectedVariant) return;
     effortValue.textContent = selectedVariant.effort || '';
     effortModel.textContent = selectedFamily.label;
@@ -668,37 +763,44 @@ async function openModelPopover(paneId, anchorBtn) {
     textWrap.className = 'model-option-text';
     textWrap.append(nameEl);
     btn.append(textWrap);
-    btn.addEventListener('click', act(async () => {
+    btn.addEventListener('click', () => {
       const variant = family.variants.find(v => v.effort === selectedVariant?.effort)
-        || family.variants.find(v => v.effort === 'Medium') || family.variants[0];
-      await applyPaneModel(paneId, variant.id);
+        || family.variants.find(v => v.default) || family.variants.find(v => v.effort === 'Medium') || family.variants[0];
       selectedFamily = family;
       selectedVariant = variant;
       refreshSelection();
-      if (family.variants.length === 1) closeModelPopover();
-      else slider.focus();
-    }));
+    });
     section.append(btn);
   }
 
   slider.addEventListener('input', () => {
     const variant = selectedFamily.variants[Number(slider.value)];
+    selectedVariant = variant;
     effortValue.textContent = variant.effort;
     slider.setAttribute('aria-valuetext', variant.effort);
+    applyBtn.disabled = isCurrentModelVariant(view, variant);
   });
-  slider.addEventListener('change', act(async () => {
-    const variant = selectedFamily.variants[Number(slider.value)];
-    await applyPaneModel(paneId, variant.id);
-    selectedVariant = variant;
-    refreshSelection();
-    slider.focus();
-  }));
 
   list.append(section);
   popover.append(list, effortControl);
 
   const footer = document.createElement('div');
   footer.className = 'model-popover-footer';
+
+  const applyBtn = document.createElement('button');
+  applyBtn.type = 'button';
+  applyBtn.className = 'model-footer-btn model-apply-btn';
+  applyBtn.textContent = 'Áp dụng';
+  applyBtn.addEventListener('click', () => {
+    if (!selectedVariant || applyBtn.disabled) return;
+    const modelId = selectedVariant.id;
+    const effort = selectedVariant.effort;
+    applyBtn.disabled = true;
+    act(async () => {
+      await applyPaneModel(paneId, modelId, effort);
+      if (activeModelPopover?.node === popover) closeModelPopover();
+    })().finally(() => { applyBtn.disabled = false; });
+  });
 
   const customBtn = document.createElement('button');
   customBtn.type = 'button';
@@ -721,7 +823,7 @@ async function openModelPopover(paneId, anchorBtn) {
     await applyPaneModel(paneId, '');
   }));
 
-  footer.append(customBtn, interactiveBtn);
+  footer.append(applyBtn, customBtn, interactiveBtn);
   popover.append(footer);
 
   document.body.append(popover);
@@ -745,6 +847,16 @@ async function openModelPopover(paneId, anchorBtn) {
   window.addEventListener('resize', onResize);
 
   activeModelPopover = { node: popover, paneId, anchorBtn, onOutside, onKeyDown, onResize };
+  if (loading) {
+    loadAgentModels(agentKey).then(() => {
+      if (activeModelPopover?.node !== popover) return;
+      syncAgentModel(view);
+      closeModelPopover();
+      openModelPopover(paneId, anchorBtn);
+    }).catch(reason => {
+      if (activeModelPopover?.node === popover) section.textContent = reason.message;
+    });
+  }
 }
 
 function agentMetaFor(preset) {
@@ -1148,6 +1260,7 @@ function makeTerminal(pane) {
     view.running = false;
     view.runningAgent = null;
     view.detectedModel = null;
+    view.detectedEffort = null;
     updatePaneModelButton(view, findPaneState(pane.id));
     view.term.reset();
     await start(view);
@@ -1192,15 +1305,18 @@ function makeTerminal(pane) {
 
   const view = {
     id: pane.id, node, host, title, modelBtn, zoomBtn, term, fit: addon,
-    running: false, runningAgent: null, detectedModel: null, observer: new ResizeObserver(() => fit(view))
+    running: false, runningAgent: null, agentPid: null, detectedModel: null, detectedEffort: null,
+    observer: new ResizeObserver(() => fit(view))
   };
   terminals.set(pane.id, view);
+  view.agentMarker = term.registerMarker(0);
+  view.agentMarkerBuffer = term.buffer.active.type;
   updatePaneModelButton(view, pane);
   view.observer.observe(host);
 
   term.onData(data => { if (view.running) api.input(pane.id, data).catch(error); });
   term.onTitleChange(value => { node.title = value; });
-  term.onWriteParsed(() => syncAgyModel(view));
+  term.onWriteParsed(() => syncAgentModel(view));
   term.attachCustomKeyEventHandler(event => {
     const modifier = platform === 'darwin' ? event.metaKey : event.ctrlKey;
     if (modifier && ['t', ',', '\\'].includes(event.key.toLowerCase())) return false;
@@ -1226,7 +1342,7 @@ function makeTerminal(pane) {
     if (!command) return;
     event.preventDefault();
     if (view.running) {
-      api.input(pane.id, command + '\r').catch(error);
+      api.input(pane.id, command + '\r').then(closeAgentDrawer).catch(error);
       term.focus();
       const meta = agentMetaFor({ title: cmdTitle || '', command });
       const droppedModel = extractCommandModel(command);
@@ -1252,6 +1368,10 @@ async function start(view) {
     view.running = true;
     view.node.classList.remove('exited');
     fit(view);
+    if (!pendingAgentLaunches.has(view.id) && !view.node.hidden && !view.runningAgent) {
+      agentDrawerAutoPane = view.id;
+      openAgentDrawer();
+    }
   } catch (reason) {
     view.running = false;
     view.node.classList.add('exited');
@@ -1267,17 +1387,25 @@ async function newTerminal(command, customName) {
   const id = crypto.randomUUID();
   const meta = command ? agentMetaFor({ title: customName || '', command }) : null;
   const detectedModel = extractCommandModel(command);
-  await update(s => {
-    const list = (s.panes[s.selected] ||= []);
-    const pane = { id, name: customName || `Terminal ${list.length + 1}`, hidden: false };
-    if (meta && meta.key !== 'custom') pane.agent = meta.key;
-    if (detectedModel) pane.model = detectedModel;
-    list.push(pane);
-  });
-  const view = terminals.get(id);
-  await view.ready;
-  view.term.focus();
-  if (command) await api.input(id, command + '\r');
+  if (command) pendingAgentLaunches.add(id);
+  try {
+    await update(s => {
+      const list = (s.panes[s.selected] ||= []);
+      const pane = { id, name: customName || `Terminal ${list.length + 1}`, hidden: false };
+      if (meta && meta.key !== 'custom') pane.agent = meta.key;
+      if (detectedModel) pane.model = detectedModel;
+      list.push(pane);
+    });
+    const view = terminals.get(id);
+    await view.ready;
+    view.term.focus();
+    if (command) {
+      await api.input(id, command + '\r');
+      closeAgentDrawer();
+    }
+  } finally {
+    pendingAgentLaunches.delete(id);
+  }
 }
 
 function setSidebarCollapsed(collapsed) {
@@ -1288,21 +1416,32 @@ function setSidebarCollapsed(collapsed) {
 }
 
 api.onOutput((id, data) => terminals.get(id)?.term.write(data));
-api.onAgent((id, agent, detectedModel) => {
+api.onAgent((id, agent, detectedModel, pid) => {
   const view = terminals.get(id);
   if (!view) return;
   const nextAgent = agent && Object.hasOwn(AGENT_MODELS, agent) ? agent : null;
-  if (view.runningAgent !== nextAgent && activeModelPopover?.paneId === id) closeModelPopover();
-  const agentChanged = view.runningAgent !== nextAgent;
+  const agentChanged = view.runningAgent !== nextAgent || view.agentPid !== pid;
+  if (agentChanged && activeModelPopover?.paneId === id) closeModelPopover();
   view.runningAgent = nextAgent;
-  view.detectedModel = detectedModel || null;
-  if (nextAgent === 'agy' && agentChanged) {
-    api.agentModels('agy').then(models => {
-      AGENT_MODELS.agy.models = models;
-      if (terminals.get(id) === view) syncAgyModel(view);
+  view.agentPid = pid;
+  if (agentChanged) {
+    view.detectedModel = detectedModel || null;
+    view.detectedEffort = null;
+    if (!nextAgent) {
+      view.agentMarker?.dispose();
+      view.agentMarker = view.term.registerMarker(0);
+      view.agentMarkerBuffer = view.term.buffer.active.type;
+    }
+  }
+  if (nextAgent && agentDrawerAutoPane === id) closeAgentDrawer();
+  if (nextAgent && agentChanged) {
+    loadAgentModels(nextAgent).then(() => {
+      if (terminals.get(id) !== view || view.runningAgent !== nextAgent || view.agentPid !== pid) return;
+      syncAgentModel(view);
+      updatePaneModelButton(view, findPaneState(id));
     }).catch(error);
   }
-  syncAgyModel(view);
+  syncAgentModel(view);
   updatePaneModelButton(view, findPaneState(id));
 });
 api.onExit((id, code) => {
@@ -1311,6 +1450,7 @@ api.onExit((id, code) => {
     view.running = false;
     view.runningAgent = null;
     view.detectedModel = null;
+    view.detectedEffort = null;
     updatePaneModelButton(view, findPaneState(id));
     view.node.classList.add('exited');
     view.term.writeln(`\r\n[Đã kết thúc: ${code}. Bấm khởi động lại để mở lại.]`);
@@ -1356,11 +1496,6 @@ function updateAgentDrawerUI() {
   $('pin-commands').title = agentDrawerPinned
     ? 'Bỏ ghim (tự ẩn khi rời chuột)'
     : 'Ghim cố định bảng lệnh';
-  requestAnimationFrame(() => {
-    for (const view of terminals.values()) {
-      if (!view.node.hidden) fit(view);
-    }
-  });
 }
 
 function openAgentDrawer() {
@@ -1371,12 +1506,20 @@ function openAgentDrawer() {
   }
 }
 
+function closeAgentDrawer() {
+  if (agentHideTimer) { clearTimeout(agentHideTimer); agentHideTimer = null; }
+  agentDrawerAutoPane = null;
+  agentDrawerPinned = false;
+  agentDrawerVisible = false;
+  updateAgentDrawerUI();
+}
+
 function scheduleHideAgentDrawer() {
   if (agentHideTimer) { clearTimeout(agentHideTimer); agentHideTimer = null; }
-  if (agentDrawerPinned) return;
+  if (agentDrawerPinned || agentDrawerAutoPane) return;
   agentHideTimer = setTimeout(() => {
     agentHideTimer = null;
-    if (isHoveringAgentDrawer || isHoveringAgentTrigger || agentDrawerPinned || document.querySelector('dialog[open]')) return;
+    if (isHoveringAgentDrawer || isHoveringAgentTrigger || agentDrawerPinned || agentDrawerAutoPane || document.querySelector('dialog[open]')) return;
     agentDrawerVisible = false;
     updateAgentDrawerUI();
   }, 220);
@@ -1410,19 +1553,15 @@ $('pin-commands').onclick = () => {
 $('commands-button').onclick = () => {
   const isShown = agentDrawerVisible || agentDrawerPinned;
   if (isShown) {
-    agentDrawerPinned = false;
-    agentDrawerVisible = false;
+    closeAgentDrawer();
+    return;
   } else {
     agentDrawerPinned = true;
     agentDrawerVisible = true;
   }
   updateAgentDrawerUI();
 };
-$('close-commands').onclick = () => {
-  agentDrawerPinned = false;
-  agentDrawerVisible = false;
-  updateAgentDrawerUI();
-};
+$('close-commands').onclick = closeAgentDrawer;
 
 $('add-command').onclick = act(async () => {
   const result = await ask('Thêm lệnh agent', '', '');

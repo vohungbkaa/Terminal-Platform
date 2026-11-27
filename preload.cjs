@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld('desktop', {
     return () => ipcRenderer.removeListener('terminal:exit', listener);
   },
   onAgent: callback => {
-    const listener = (_event, id, agent, model) => callback(id, agent, model);
+    const listener = (_event, id, agent, model, pid) => callback(id, agent, model, pid);
     ipcRenderer.on('terminal:agent', listener);
     return () => ipcRenderer.removeListener('terminal:agent', listener);
   }

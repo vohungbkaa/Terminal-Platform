@@ -118,6 +118,23 @@ function parseAgentModels(output) {
   });
 }
 
+function parseCodexModels(catalog) {
+  const levels = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'ultra']);
+  if (!Array.isArray(catalog?.models)) return [];
+  return catalog.models.flatMap(item => {
+    if (!item || item.visibility !== 'list' || typeof item.slug !== 'string' ||
+        !/^[\w.:/-]{1,200}$/.test(item.slug) || typeof item.display_name !== 'string' ||
+        !item.display_name.trim() || /[\x00-\x1f]/.test(item.display_name)) return [];
+    const base = { id: item.slug, label: item.display_name.slice(0, 200) };
+    const efforts = Array.isArray(item.supported_reasoning_levels)
+      ? item.supported_reasoning_levels.filter(level => levels.has(level?.effort)) : [];
+    return efforts.length ? efforts.map(level => ({
+      ...base, label: `${base.label} (${level.effort[0].toUpperCase()}${level.effort.slice(1)})`,
+      effort: level.effort, default: level.effort === item.default_reasoning_level
+    })) : [base];
+  });
+}
+
 function extractModelFlag(command) {
   if (typeof command !== 'string' || !command) return null;
   const match = command.match(/(?:^|\s)(?:--model|-m)(?:=|\s+)(?:"([^"]+)"|'([^']+)'|(\S+))/);
@@ -161,4 +178,4 @@ function detectAgentFromArgs(args) {
   return null;
 }
 
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels };
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels };

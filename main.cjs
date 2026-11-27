@@ -19,12 +19,12 @@ const pageURL = pathToFileURL(path.join(__dirname, 'index.html')).href;
 
 function emitAgentState(id, detected) {
   const prev = sessionAgents.get(id) || { agent: null, model: null };
-  const next = detected ? { agent: detected.agent || null, model: detected.model || null } : { agent: null, model: null };
-  if (prev.agent === next.agent && prev.model === next.model) return;
+  const next = detected ? { agent: detected.agent || null, model: detected.model || null, pid: detected.pid || null } : { agent: null, model: null, pid: null };
+  if (prev.agent === next.agent && prev.model === next.model && (prev.pid || null) === next.pid) return;
   if (next.agent) sessionAgents.set(id, next);
   else sessionAgents.delete(id);
   if (window && !window.isDestroyed()) {
-    window.webContents.send('terminal:agent', id, next.agent, next.model);
+    window.webContents.send('terminal:agent', id, next.agent, next.model, next.pid);
   }
 }
 
@@ -59,7 +59,7 @@ function pollRunningAgents() {
         if (visited.has(proc.pid)) continue;
         visited.add(proc.pid);
         const found = model.detectAgentFromArgs(proc.args);
-        if (found) { detected = found; break; }
+        if (found) { detected = { ...found, pid: proc.pid }; break; }
         const kids = childrenByPpid.get(proc.pid);
         if (kids) queue.push(...kids);
       }
@@ -134,6 +134,12 @@ else {
     window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
     handle('workspace:load', () => ({ state, home: os.homedir(), platform: process.platform, arch: process.arch, shells: model.shells }));
     handle('agent:models', agent => {
+      if (agent === 'codex') {
+        const home = process.env.CODEX_HOME || path.join(os.homedir(), '.codex');
+        return fs.promises.readFile(path.join(home, 'models_cache.json'), 'utf8')
+          .then(data => model.parseCodexModels(JSON.parse(data)))
+          .catch(() => []);
+      }
       if (agent !== 'agy') throw new Error('Agent không hỗ trợ danh sách model.');
       return new Promise((resolve, reject) => {
         execFile(process.platform === 'win32' ? 'agy.exe' : 'agy', ['models'], {

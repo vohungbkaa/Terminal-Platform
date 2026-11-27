@@ -107,7 +107,8 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
   - Hiển thị đường dẫn thư mục hiện tại với nút 1-click sao chép đường dẫn (kèm phản hồi icon checkmark).
   - Khay Dock các terminal đang ẩn chạy ngầm (Hidden Panes) dạng capsule giúp khôi phục nhanh mà không làm nhảy bố cục.
   - Hiển thị badge tỉ lệ lưới hiện tại (`1×1`, `1×2`, `2×2`...) và nhãn shell đang dùng.
-- **Bảng lệnh Agent (Drawer kính mờ)**: Bảng lệnh trượt nổi bên phải, hỗ trợ kéo thả lệnh vào bất kỳ terminal nào hoặc bấm để mở ngay terminal mới.
+- **Bảng lệnh Agent (Drawer kính mờ)**: Bảng lệnh trượt nổi bên phải, hỗ trợ kéo thả lệnh vào bất kỳ terminal nào hoặc bấm để mở ngay terminal mới. Tự mở khi mở shell trống (terminal mới, khôi phục hoặc khởi động lại) và tự thu lại sau khi gửi lệnh từ bảng hoặc khi agent trong terminal đó bắt đầu chạy.
+- **Model trên toolbar terminal**: Theo dõi trạng thái đang hiển thị của agy, Codex, Claude và Gemini theo từng tiến trình. agy lấy danh sách từ `agy models`; Codex đọc danh sách và các mức reasoning trong cache của CLI (`CODEX_HOME/models_cache.json`, mặc định `~/.codex/models_cache.json`). Chọn model và mức rồi bấm **Áp dụng** mới gửi lệnh. Claude/Gemini và Codex chưa có cache dùng menu `/model` gốc để giữ đúng các lựa chọn của agent. Mở lại ứng dụng để làm mới danh sách đã tải.
 - **Bảng Thiết Lập (Settings Slide-over)**: Dạng panel kính mờ trượt từ cạnh phải, gồm bộ thẻ preview trực quan cho 4 theme màu, thanh trượt cỡ chữ có live preview dòng lệnh và chọn shell mặc định.
 - **Hệ thống 4 Theme màu sắc**: Graphite, Obsidian, Warm Dusk, Nord Frost đồng bộ chính xác token màu và bảng màu 16-ANSI với `Theme.swift`.
 - **Phím tắt chuẩn Desktop**:
@@ -127,6 +128,8 @@ Workspace được lưu vào `workspace.json` trong `app.getPath('userData')`. T
 Xóa project/task chỉ xóa cấu hình và dừng terminal liên quan, không xóa mã nguồn trên ổ đĩa. Workspace lỗi được giữ nguyên và ứng dụng báo vị trí file để khôi phục, không ghi đè bằng dữ liệu rỗng.
 
 Khi thoát ứng dụng hoặc đóng cửa sổ cuối cùng, ứng dụng xác nhận trước khi dừng các terminal. Mở lại sẽ khôi phục bố cục và mở shell mới khi truy cập workspace; không khôi phục tiến trình/nội dung hoặc tự chạy lại lệnh agent.
+
+Tên model trên toolbar phụ thuộc vào trạng thái mà CLI hiển thị. Footer bị ẩn, bị cắt do terminal quá hẹp hoặc đổi định dạng có thể khiến ứng dụng chưa xác định được model; khi đó dùng menu `/model` của agent để kiểm tra.
 
 Bản này chưa chuyển thanh chọn thiết bị/Run mobile, icon project tùy chỉnh, kéo ảnh/file vào terminal và kéo thay đổi chiều rộng từng cột từ bản Swift. Flutter/Android có thể dùng CLI với SDK cài riêng; build/chạy iOS vẫn cần Mac và Xcode. Đây là ứng dụng desktop, không phải ứng dụng iPhone/iPad.
 

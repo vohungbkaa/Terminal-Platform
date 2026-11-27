@@ -114,3 +114,17 @@ test('parseAgentModels reads the CLI catalog and ignores notices and malformed e
     { id: 'claude-opus-5-5-high', label: 'Claude Opus 5.5 (High)' }
   ]);
 });
+
+test('Codex catalog uses visible CLI models and their actual reasoning levels', () => {
+  assert.deepEqual(model.parseCodexModels({ models: [
+    { slug: 'gpt-6.1-sol', display_name: 'GPT-6.1-Sol', visibility: 'list', default_reasoning_level: 'medium',
+      supported_reasoning_levels: [{ effort: 'low' }, { effort: 'medium' }, { effort: 'ultra' }, { effort: 'invalid' }, null] },
+    { slug: 'internal', display_name: 'Hidden', visibility: 'hide' },
+    { slug: 'bad\nmodel', display_name: 'Invalid', visibility: 'list' }
+  ] }), [
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (Low)', effort: 'low', default: false },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (Medium)', effort: 'medium', default: true },
+    { id: 'gpt-6.1-sol', label: 'GPT-6.1-Sol (Ultra)', effort: 'ultra', default: false }
+  ]);
+  assert.deepEqual(model.parseCodexModels({}), []);
+});

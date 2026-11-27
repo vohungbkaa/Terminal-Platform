@@ -1054,6 +1054,13 @@ body.platform-darwin.sidebar-collapsed #topbar {
   color: var(--text);
   background: var(--surface-active);
 }
+.model-apply-btn {
+  justify-content: center;
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+  font-weight: 600;
+}
+.model-apply-btn:disabled { opacity: 0.45; cursor: default; }
 
 .pane-actions {
   display: flex;
