@@ -25,6 +25,7 @@ app.on('browser-window-created', (_event, window) => {
     try {
       await waitFor("typeof state !== 'undefined' && state && document.getElementById('status').textContent.includes('0/9')");
       assert.equal(await run('typeof require'), 'undefined');
+      assert.equal(await run("CSS.supports('transition-behavior', 'allow-discrete')"), true);
       assert.equal(await run('state.settings.shell'), process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
       assert.deepEqual(await run("Array.from(document.getElementById('shell').options, option => option.value)"), Object.keys(model.shells));
       assert.deepEqual(await run('Array.from({length: 10}, (_, i) => grid(i))'), [[1,1],[1,1],[1,2],[2,2],[2,2],[2,3],[2,3],[3,3],[3,3],[3,3]]);
@@ -74,6 +75,7 @@ setInterval(() => {}, 1000);\n`);
         await run("globalThis.modelCommands = []; globalThis.originalApplyPaneModel = applyPaneModel; applyPaneModel = (...args) => { modelCommands.push(args); return originalApplyPaneModel(...args); }; void 0");
         await run("document.querySelector('.pane-model-btn').click()");
         assert.equal(await run("Boolean(document.querySelector('.model-option[data-model-id=neon-medium]'))"), true);
+        assert.equal(await run("getComputedStyle(document.querySelector('.model-popover')).animationName"), 'popover-enter');
         await waitFor("Boolean(document.querySelector('.model-option[data-model-id=neon-medium]'))");
         assert.equal(await run("document.querySelectorAll('.model-option').length"), 1);
         assert.equal(await run("document.querySelector('.model-option').textContent"), 'Gemini 4 Neon');
@@ -176,7 +178,11 @@ setInterval(() => {}, 1000);
       await waitFor("state.panes.task.length === 1 && terminals.get(state.panes.task[0].id)?.running");
       await run("act(() => update(s => { s.selected = 'home'; }))()");
       assert.equal(await run('[...terminals.keys()][0]'), first);
-      await run("document.getElementById('settings-button').click()");
+      const terminalSize = await run("({ width: [...terminals.values()][0].host.clientWidth, height: [...terminals.values()][0].host.clientHeight })");
+      await run("for (let i = 0; i < 3; i++) { openSettings(); closeSettings(); } document.getElementById('settings-button').click()");
+      assert.equal(await run("document.getElementById('settings-dialog').open"), true);
+      assert.equal(await run("getComputedStyle(document.getElementById('settings-dialog')).transitionProperty.includes('opacity')"), true);
+      assert.deepEqual(await run("({ width: [...terminals.values()][0].host.clientWidth, height: [...terminals.values()][0].host.clientHeight })"), terminalSize);
       await run("document.getElementById('theme').value = 'nordFrost'; document.getElementById('font-size').value = '16'; document.getElementById('settings-form').requestSubmit()");
       await waitFor("state.settings.theme === 'nordFrost'");
       const persisted = model.load(path.join(temporary, 'workspace.json'));

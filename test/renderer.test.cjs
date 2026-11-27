@@ -6,6 +6,42 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
 const context = vm.createContext({});
+
+test('terminal layout requests are combined into one fit per frame', () => {
+  const frames = [];
+  let fits = 0;
+  const layout = vm.createContext({
+    requestAnimationFrame: callback => { frames.push(callback); return frames.length; },
+    fit: () => { fits++; }
+  });
+  vm.runInContext(source.slice(source.indexOf('function queueFit('), source.indexOf('function fit(')), layout);
+  const view = {};
+  layout.queueFit(view);
+  layout.queueFit(view);
+  layout.queueFit(view);
+  assert.equal(frames.length, 1);
+  frames[0]();
+  assert.equal(fits, 1);
+  layout.queueFit(view);
+  assert.equal(frames.length, 2);
+});
+
+test('unchanged theme avoids style writes while canceling a preview restores the theme', () => {
+  let writes = 0;
+  const tokens = vm.createContext({
+    themes: { graphite: { id: 'graphite' }, preview: { id: 'preview' } },
+    document: { documentElement: { style: { setProperty() { writes++; } } } }
+  });
+  vm.runInContext(source.slice(source.indexOf('let appliedThemeId ='), source.indexOf('function xtermThemeFor(')), tokens);
+  tokens.applyThemeTokens('graphite');
+  const initial = writes;
+  assert.ok(initial > 0);
+  tokens.applyThemeTokens('graphite');
+  assert.equal(writes, initial);
+  tokens.applyThemeTokens('preview');
+  tokens.applyThemeTokens('graphite');
+  assert.equal(writes, initial * 3);
+});
 vm.runInContext(source.slice(source.indexOf('function groupModelVariants('), source.indexOf('function modelLabelFor(')), context);
 vm.runInContext(source.slice(source.indexOf('function activeModelForView('), source.indexOf('function syncAgentModel(')), context);
 

@@ -219,7 +219,8 @@ else {
     });
     handle('terminal:resize', (id, cols, rows) => {
       if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || rows < 1 || cols > 1000 || rows > 1000) throw new Error('Kích thước terminal không hợp lệ.');
-      sessions.get(id)?.resize(cols, rows);
+      const session = sessions.get(id);
+      if (session && (session.cols !== cols || session.rows !== rows)) session.resize(cols, rows);
     });
     handle('terminal:kill', id => { model.text(id, 100); return stop(id); });
     window.on('close', event => {

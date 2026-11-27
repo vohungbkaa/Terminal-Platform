@@ -210,8 +210,11 @@ function grid(count) {
   return count <= 1 ? [1, 1] : count === 2 ? [1, 2] : count <= 4 ? [2, 2] : count <= 6 ? [2, 3] : [3, 3];
 }
 
+let appliedThemeId = null;
 function applyThemeTokens(themeId) {
   const t = themes[themeId] || themes.graphite;
+  if (appliedThemeId === t.id) return t;
+  appliedThemeId = t.id;
   const root = document.documentElement.style;
   root.setProperty('--bg', t.bg);
   root.setProperty('--sidebar-bg', t.sidebarBg);
@@ -357,6 +360,7 @@ function render() {
   for (const [id, view] of terminals) {
     if (!allIDs.has(id)) {
       view.observer.disconnect();
+      if (view.fitFrame) cancelAnimationFrame(view.fitFrame);
       view.term.dispose();
       view.node.remove();
       terminals.delete(id);
@@ -377,9 +381,12 @@ function render() {
       view.zoomBtn.innerHTML = maximized === pane.id ? ICONS.compress : ICONS.expand;
       view.zoomBtn.classList.toggle('active', maximized === pane.id);
       view.zoomBtn.title = maximized === pane.id ? 'Thu về lưới' : 'Phóng to Terminal này';
-      view.term.options.fontSize = state.settings.fontSize;
-      view.term.options.theme = termTheme;
-      if (!view.node.hidden) requestAnimationFrame(() => fit(view));
+      if (view.term.options.fontSize !== state.settings.fontSize) view.term.options.fontSize = state.settings.fontSize;
+      if (view.themeId !== state.settings.theme) {
+        view.term.options.theme = termTheme;
+        view.themeId = state.settings.theme;
+      }
+      if (!view.node.hidden) queueFit(view);
     }
   }
 
@@ -1205,6 +1212,14 @@ function renderCommands() {
   }
 }
 
+function queueFit(view) {
+  if (view.fitFrame) return;
+  view.fitFrame = requestAnimationFrame(() => {
+    view.fitFrame = null;
+    fit(view);
+  });
+}
+
 function fit(view) {
   if (view.node.hidden || view.host.clientWidth < 30 || view.host.clientHeight < 30) return;
   try {
@@ -1306,7 +1321,7 @@ function makeTerminal(pane) {
   const view = {
     id: pane.id, node, host, title, modelBtn, zoomBtn, term, fit: addon,
     running: false, runningAgent: null, agentPid: null, detectedModel: null, detectedEffort: null,
-    observer: new ResizeObserver(() => fit(view))
+    themeId: state.settings.theme, observer: new ResizeObserver(() => queueFit(view))
   };
   terminals.set(pane.id, view);
   view.agentMarker = term.registerMarker(0);
