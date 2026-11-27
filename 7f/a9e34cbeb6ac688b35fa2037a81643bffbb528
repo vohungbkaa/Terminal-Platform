@@ -1,0 +1,51 @@
+README.md
+  s_5c4c7109c47371::t_efb2479f9fa063 1-98
+index.html
+  s_5c4c7109c47371::t_c979ad7ea50b61 1-32
+package-lock.json
+  s_5c4c7109c47371::t_dd3d3ab15a8d32 1-3627
+package.json
+  s_5c4c7109c47371::t_297c8244a6f0c0 1-86
+preload.cjs
+  s_b4e8b1583588bd::t_0aaa3462224b70 1-22
+styles.css
+  s_b4e8b1583588bd::t_507c9c55270af4 1-58
+test/smoke.cjs
+  s_5c4c7109c47371::t_954bd576c073d2 1-91
+test/unicode.cjs
+  s_5c4c7109c47371::t_eb1a9a17101d4e 1-119
+.gitignore
+  s_a2645fea9695a7::t_e14b62008f69cb 1-3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7fa9e34cbeb6ac688b35fa2037a81643bffbb528",
+  "prompts": {},
+  "sessions": {
+    "s_5c4c7109c47371": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21b54-127e-7863-9200-21806750fd15",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    },
+    "s_a2645fea9695a7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bb3-b0e2-78b1-907d-1869e870fa68",
+        "model": "unknown"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    },
+    "s_b4e8b1583588bd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a216c8-282d-7113-a715-6f6c4aae4e02",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
