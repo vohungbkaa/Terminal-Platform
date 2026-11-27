@@ -180,6 +180,7 @@ else {
       if (result.canceled) return null;
       return model.createFolder(result.filePaths[0], name);
     });
+    handle('project:list-directory', (id, relative) => model.listDirectory(state, id, relative));
     handle('terminal:start', id => {
       model.text(id, 100);
       const entity = model.findPane(state, id);

@@ -117,6 +117,38 @@ async function createFolder(parent, name) {
   await fs.promises.mkdir(directory);
   return { path: directory, name };
 }
+
+function isWithinDirectory(root, directory) {
+  const relative = path.relative(root, directory);
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+async function listDirectory(state, projectId, relative = '') {
+  text(projectId, 100);
+  const project = state.projects.find(item => item.id === projectId);
+  if (!project || typeof relative !== 'string' || relative.length > 4096 || relative.includes('\0') || path.isAbsolute(relative)) {
+    throw new Error('Thư mục dự án không hợp lệ.');
+  }
+  const root = await fs.promises.realpath(project.path);
+  const directory = await fs.promises.realpath(path.resolve(root, relative));
+  if (!isWithinDirectory(root, directory)) {
+    throw new Error('Chỉ được duyệt thư mục trong project.');
+  }
+  const entries = await fs.promises.readdir(directory, { withFileTypes: true });
+  return (await Promise.all(entries.map(async entry => {
+    let isDirectory = entry.isDirectory();
+    if (entry.isSymbolicLink()) {
+      try {
+        const target = await fs.promises.realpath(path.join(directory, entry.name));
+        if (isWithinDirectory(root, target)) isDirectory = (await fs.promises.stat(target)).isDirectory();
+      } catch { /* Broken or unreadable links remain draggable leaves. */ }
+    }
+    return {
+      name: entry.name, path: path.join(project.path, relative, entry.name),
+      relative: path.join(relative, entry.name), directory: isDirectory
+    };
+  }))).sort((a, b) => a.directory === b.directory ? a.name.localeCompare(b.name) : a.directory ? -1 : 1);
+}
 const AGENT_BINARIES = new Map([
   ['claude', 'claude'],
   ['claude-code', 'claude'],
@@ -194,4 +226,4 @@ function detectAgentFromArgs(args) {
   return null;
 }
 
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder, validateOpacity };
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder, validateOpacity, listDirectory };

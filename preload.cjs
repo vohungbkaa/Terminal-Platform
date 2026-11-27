@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('desktop', {
   filePaths: files => files.map(file => webUtils.getPathForFile(file)),
   folder: () => ipcRenderer.invoke('project:folder'),
   createFolder: name => ipcRenderer.invoke('project:create-folder', name),
+  listDirectory: (id, relative) => ipcRenderer.invoke('project:list-directory', id, relative),
   start: id => ipcRenderer.invoke('terminal:start', id),
   input: (id, data) => ipcRenderer.invoke('terminal:input', id, data),
   resize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', id, cols, rows),

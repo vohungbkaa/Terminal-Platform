@@ -5,6 +5,38 @@ const os = require('node:os');
 const path = require('node:path');
 const model = require('../model.cjs');
 
+test('directory browsing loads one level and refuses paths or symlinks outside the project', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'termanager-tree-'));
+  const root = path.join(parent, 'project');
+  const outside = path.join(parent, 'outside');
+  fs.mkdirSync(path.join(root, 'src', 'nested'), { recursive: true });
+  fs.mkdirSync(outside);
+  fs.writeFileSync(path.join(root, 'Xin chào.txt'), 'text');
+  fs.writeFileSync(path.join(root, 'src', 'nested', 'deep.txt'), 'deep');
+  const state = model.defaults();
+  state.projects.push({ id: 'project', name: 'Project', path: root, tasks: [] });
+  try {
+    const entries = await model.listDirectory(state, 'project');
+    assert.deepEqual(entries.map(entry => entry.name), ['src', 'Xin chào.txt']);
+    assert.equal(entries[0].directory, true);
+    assert.equal(entries[1].directory, false);
+    assert.deepEqual((await model.listDirectory(state, 'project', 'src')).map(entry => entry.name), ['nested']);
+    await assert.rejects(model.listDirectory(state, 'missing'));
+    await assert.rejects(model.listDirectory(state, 'project', '../outside'));
+    await assert.rejects(model.listDirectory(state, 'project', outside));
+    if (process.platform !== 'win32') {
+      fs.symlinkSync(outside, path.join(root, 'outside-link'));
+      await assert.rejects(model.listDirectory(state, 'project', 'outside-link'));
+      fs.symlinkSync(path.join(root, 'src'), path.join(root, 'src-link'));
+      const links = await model.listDirectory(state, 'project');
+      assert.equal(links.find(entry => entry.name === 'src-link').directory, true);
+      assert.equal(links.find(entry => entry.name === 'outside-link').directory, false);
+      const linked = await model.listDirectory(state, 'project', 'src-link');
+      assert.equal(linked[0].relative, path.join('src-link', 'nested'));
+    }
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
 test('createFolder creates a real Unicode directory and rejects traversal and existing paths', async () => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'termanager-folder-'));
   try {

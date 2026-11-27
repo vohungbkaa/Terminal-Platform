@@ -9,7 +9,8 @@ let agentDrawerAutoPane = null;
 let isHoveringAgentTrigger = false;
 let isHoveringAgentDrawer = false;
 let agentHideTimer = null;
-const collapsedProjects = new Set();
+const expandedDirectories = new Set();
+const directoryCache = new Map();
 const terminals = new Map();
 const pendingAgentLaunches = new Set();
 let activeModelPopover = null;
@@ -97,6 +98,7 @@ const themeOrder = ['graphite', 'obsidian', 'warmDusk', 'nordFrost', 'hacker'];
 
 // Crisp inline SVG icon helpers matching SF Symbols from native TerManager
 const ICONS = {
+  file: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6Z"/><path d="M9 2v4h4"/></svg>',
   terminal: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5 6.8 8 3 11.5M8.2 11.5H13"/></svg>',
   folder: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.4 1.6h4.6A1.5 1.5 0 0 1 14 6.1v5.4a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Z"/></svg>',
   folderPlus: '<svg class="icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h3l1.4 1.6h4.6A1.5 1.5 0 0 1 14 6.1v5.4a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 11.5v-7Z"/><path d="M8 7v3.6M6.2 8.8h3.6"/></svg>',
@@ -938,6 +940,82 @@ function renderLaunchpadAgents() {
   }
 }
 
+function makePathDraggable(node, path) {
+  node.draggable = true;
+  node.addEventListener('dragstart', event => {
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('application/x-termanager-path', path);
+    event.dataTransfer.setData('text/plain', path);
+  });
+}
+
+function toggleDirectory(project, relative = '') {
+  const key = `${project.id}:${relative}`;
+  if (expandedDirectories.has(key)) expandedDirectories.delete(key);
+  else {
+    expandedDirectories.add(key);
+    if (!directoryCache.get(key)?.promise) directoryCache.delete(key);
+  }
+  renderSidebar();
+  const target = relative
+    ? [...document.querySelectorAll('.file-row')].find(row => row.dataset.projectId === project.id && row.dataset.relative === relative)
+    : document.querySelector(`.project-row[data-project-id="${project.id}"] .disclosure-rail`);
+  target?.focus({ preventScroll: true });
+}
+
+function renderDirectory(project, relative = '') {
+  const key = `${project.id}:${relative}`;
+  const tree = document.createElement('div');
+  tree.className = 'directory-tree';
+  let record = directoryCache.get(key);
+  if (!record) {
+    record = {};
+    directoryCache.set(key, record);
+    record.promise = api.listDirectory(project.id, relative).then(
+      entries => { record.entries = entries; },
+      reason => { record.error = reason?.message || 'Không đọc được thư mục.'; }
+    ).finally(() => { record.promise = null; });
+  }
+  if (record.promise) {
+    tree.classList.add('directory-message');
+    tree.setAttribute('role', 'status');
+    tree.textContent = 'Đang tải…';
+    record.promise.then(() => {
+      if (tree.isConnected) tree.replaceWith(renderDirectory(project, relative));
+    });
+    return tree;
+  }
+  if (record.error || !record.entries.length) {
+    tree.classList.add('directory-message');
+    tree.textContent = record.error ? 'Không đọc được thư mục. Thu rồi mở lại để thử.' : 'Thư mục trống';
+    tree.title = record.error || '';
+    return tree;
+  }
+  for (const entry of record.entries) {
+    const expanded = expandedDirectories.has(`${project.id}:${entry.relative}`);
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'file-row';
+    row.dataset.path = entry.path;
+    row.dataset.relative = entry.relative;
+    row.dataset.projectId = project.id;
+    row.title = entry.path;
+    row.innerHTML = `<span class="disclosure-rail">${entry.directory ? expanded ? ICONS.chevronDown : ICONS.chevronRight : ''}</span>${entry.directory ? ICONS.folder : ICONS.file}`;
+    const label = document.createElement('span');
+    label.className = 'file-name';
+    label.textContent = entry.name;
+    row.append(label);
+    makePathDraggable(row, entry.path);
+    if (entry.directory) {
+      row.setAttribute('aria-expanded', String(expanded));
+      row.addEventListener('click', () => toggleDirectory(project, entry.relative));
+    }
+    tree.append(row);
+    if (entry.directory && expanded) tree.append(renderDirectory(project, entry.relative));
+  }
+  return tree;
+}
+
 function renderSidebar() {
   const nav = $('projects');
   nav.replaceChildren();
@@ -1015,30 +1093,23 @@ function renderSidebar() {
       section.className = 'project-section';
 
       const hasTasks = project.tasks.length > 0;
-      const isExpanded = !collapsedProjects.has(project.id);
+      const isExpanded = expandedDirectories.has(`${project.id}:`);
       const paneCount = (state.panes[project.id] || []).length;
 
       const row = document.createElement('div');
       row.className = `project-row ${state.selected === project.id ? 'selected' : ''}`;
       row.title = abbreviatePath(project.path);
+      row.dataset.projectId = project.id;
+      makePathDraggable(row, project.path);
 
-      if (hasTasks) {
-        const toggle = iconButton(
-          isExpanded ? ICONS.chevronDown : ICONS.chevronRight,
-          isExpanded ? 'Thu gọn' : `Mở rộng (${project.tasks.length} Task)`,
-          () => {
-            if (collapsedProjects.has(project.id)) collapsedProjects.delete(project.id);
-            else collapsedProjects.add(project.id);
-            renderSidebar();
-          },
-          'disclosure-rail'
-        );
-        row.append(toggle);
-      } else {
-        const spacer = document.createElement('span');
-        spacer.className = 'disclosure-rail';
-        row.append(spacer);
-      }
+      const toggle = iconButton(
+        isExpanded ? ICONS.chevronDown : ICONS.chevronRight,
+        isExpanded ? 'Thu gọn thư mục' : 'Mở thư mục',
+        () => toggleDirectory(project),
+        'disclosure-rail'
+      );
+      toggle.setAttribute('aria-expanded', String(isExpanded));
+      row.append(toggle);
 
       const selectBtn = document.createElement('button');
       selectBtn.type = 'button';
@@ -1067,7 +1138,7 @@ function renderSidebar() {
           const result = await ask('Thêm task', `Task ${number}`);
           if (!result) return;
           const id = crypto.randomUUID();
-          collapsedProjects.delete(project.id);
+          expandedDirectories.add(`${project.id}:`);
           await update(s => {
             s.projects.find(p => p.id === project.id).tasks.push({ id, name: result.name });
             s.selected = id;
@@ -1156,6 +1227,8 @@ function renderSidebar() {
         tree.append(guide, taskList);
         section.append(tree);
       }
+
+      if (isExpanded) section.append(renderDirectory(project));
 
       wsGroup.append(section);
     }
@@ -1258,11 +1331,15 @@ function quoteDroppedPaths(paths, shell) {
   }).join(' ') + ' ';
 }
 
-function pasteDroppedFiles(view, files) {
+function pasteTerminalPaths(view, paths) {
   if (!view.running) throw new Error('Terminal đã dừng. Bấm khởi động lại để mở lại.');
-  const paths = api.filePaths(Array.from(files));
   view.term.paste(quoteDroppedPaths(paths, view.shell));
   view.term.focus();
+}
+
+function droppedPaths(transfer) {
+  const path = transfer.getData('application/x-termanager-path');
+  return path ? [path] : api.filePaths(Array.from(transfer.files));
 }
 
 function compositionDelta(previous, next) {
@@ -1410,7 +1487,6 @@ function makeTerminal(pane) {
   }, 'pane-btn');
 
   const closeBtn = iconButton(ICONS.close, 'Đóng và dừng terminal', async () => {
-    if (!confirm('Đóng terminal và dừng lệnh đang chạy?')) return;
     await update(s => {
       for (const key of Object.keys(s.panes)) s.panes[key] = s.panes[key].filter(p => p.id !== pane.id);
     });
@@ -1465,7 +1541,7 @@ function makeTerminal(pane) {
   });
 
   node.addEventListener('dragover', event => {
-    if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('Files')) {
+    if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('application/x-termanager-path') || event.dataTransfer.types.includes('Files')) {
       event.preventDefault();
       node.classList.add('drag-over');
     }
@@ -1473,9 +1549,9 @@ function makeTerminal(pane) {
   node.addEventListener('dragleave', () => node.classList.remove('drag-over'));
   node.addEventListener('drop', event => {
     node.classList.remove('drag-over');
-    if (event.dataTransfer.files.length) {
+    if (event.dataTransfer.files.length || event.dataTransfer.types.includes('application/x-termanager-path')) {
       event.preventDefault();
-      try { pasteDroppedFiles(view, event.dataTransfer.files); } catch (reason) { error(reason); }
+      try { pasteTerminalPaths(view, droppedPaths(event.dataTransfer)); } catch (reason) { error(reason); }
       return;
     }
     const command = event.dataTransfer.getData('application/x-termanager-command');
@@ -1756,12 +1832,12 @@ $('copy-path').addEventListener('click', act(async () => {
 // Drop Agent Command onto empty Launchpad
 for (const type of ['dragover', 'drop']) {
   document.addEventListener(type, event => {
-    if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+    if (event.dataTransfer.types.includes('Files') || event.dataTransfer.types.includes('application/x-termanager-path')) event.preventDefault();
   });
 }
 const emptyEl = $('empty');
 emptyEl.addEventListener('dragover', event => {
-  if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('Files')) {
+  if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('application/x-termanager-path') || event.dataTransfer.types.includes('Files')) {
     event.preventDefault();
     emptyEl.classList.add('drag-over');
     $('launchpad-tip').textContent = 'Thả vào đây để mở Terminal ngay';
@@ -1774,13 +1850,13 @@ emptyEl.addEventListener('dragleave', () => {
 emptyEl.addEventListener('drop', event => {
   emptyEl.classList.remove('drag-over');
   $('launchpad-tip').textContent = 'Mẹo: Kéo lệnh Agent từ thanh bên vào đây để mở nhanh';
-  if (event.dataTransfer.files.length) {
+  if (event.dataTransfer.files.length || event.dataTransfer.types.includes('application/x-termanager-path')) {
     event.preventDefault();
-    const files = Array.from(event.dataTransfer.files);
+    const paths = droppedPaths(event.dataTransfer);
     act(async () => {
       await newTerminal();
       const pane = state.panes[state.selected].at(-1);
-      pasteDroppedFiles(terminals.get(pane.id), files);
+      pasteTerminalPaths(terminals.get(pane.id), paths);
     })();
     return;
   }

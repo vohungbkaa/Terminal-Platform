@@ -98,6 +98,8 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
   - Nút thư mục có dấu **+** tạo thư mục thật trên ổ đĩa: nhập tên, chọn nơi lưu; thư mục mới được thêm thành project. Nút **+** bên cạnh vẫn thêm thư mục đã có.
   - Tự động hiển thị ô lọc nhanh khi có từ 4 dự án trở lên.
   - Cây danh mục dự án & task có hướng dẫn đường kẻ dọc (tree-guide), icon phân loại SVG trực quan (`sparkles` cho AI tasks, `terminal` cho terminal tasks), đếm số lượng terminal đang chạy, thao tác sửa/xóa/thêm hiện mượt mà khi hover.
+  - Mũi tên cạnh project mở danh sách file và thư mục cấp đầu. Mỗi thư mục con chỉ tải khi mở, có thể thu lại; gập rồi mở lại để cập nhật danh sách, không quét đệ quy toàn bộ project. Chỉ duyệt trong thư mục project, kể cả khi đi qua symlink.
+  - Kéo project, thư mục con hoặc file từ sidebar vào chat agent/terminal để chèn đường dẫn; không tự gửi Enter.
   - Thanh footer gắn bộ 5 chấm chọn giao diện nhanh (Theme Swatches) cùng nút mở Thiết lập.
 - **Không gian khởi chạy (Developer Launchpad)**: Khi một workspace chưa có terminal nào, hiển thị màn hình Launchpad với hiệu ứng radial glow, các thẻ thao tác nhanh (**Mở Terminal**, **Chia đôi màn hình**), các nút AI CLI (`agy`, `codex`, `claude`, `gemini`), và hỗ trợ kéo thả lệnh hoặc thư mục trực tiếp vào.
 - **Lưới Terminal & Phóng to (Zoom / Focus Mode)**:

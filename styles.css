@@ -394,6 +394,28 @@ body.platform-darwin .sidebar-title {
   gap: 2px;
 }
 
+.directory-tree {
+  margin-left: 18px;
+  padding-left: 5px;
+  border-left: 1px solid var(--border);
+}
+.file-row {
+  width: 100%;
+  min-width: 0;
+  height: 27px;
+  justify-content: flex-start;
+  gap: 5px;
+  padding: 0 5px 0 0;
+  border-radius: 5px;
+  text-align: left;
+  cursor: grab;
+}
+.file-row:hover, .file-row:focus { background: var(--surface-active); }
+.file-row .icon { width: 12px; height: 12px; flex-shrink: 0; color: var(--muted); }
+.file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.directory-message { padding: 6px; color: var(--muted); font-size: 10px; }
+.project-row[draggable=true]:active, .file-row:active { cursor: grabbing; }
+
 .project-row {
   display: flex;
   align-items: center;
