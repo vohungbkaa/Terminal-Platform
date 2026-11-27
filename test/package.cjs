@@ -40,7 +40,7 @@ for (const file of ['main.cjs', 'preload.cjs', 'model.cjs', 'renderer.js', 'inde
   'fonts/FiraCode-VF.woff2', 'fonts/OFL.txt',
   'node_modules/@xterm/xterm/lib/xterm.js', 'node_modules/@xterm/xterm/css/xterm.css',
   'node_modules/@xterm/addon-fit/lib/addon-fit.js', 'node_modules/node-pty/lib/index.js']) {
-  assert.ok(asar.statFile(archive, file).size > 0, file);
+  assert.ok(asar.statFile(archive, path.normalize(file)).size > 0, file);
 }
 for (const file of ['main.cjs', 'model.cjs', 'renderer.js', 'index.html', 'styles.css', 'fonts/FiraCode-VF.woff2']) {
   assert.deepEqual(asar.extractFile(archive, file), fs.readFileSync(path.join(__dirname, '..', file)), `Stale packaged file: ${file}`);

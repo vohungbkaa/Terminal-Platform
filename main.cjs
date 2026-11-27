@@ -189,7 +189,7 @@ else {
       if (!fs.statSync(cwd).isDirectory()) throw new Error('Thư mục project không tồn tại.');
       const isWindows = process.platform === 'win32';
       const executable = state.settings.shell;
-      const args = !isWindows ? ['-l'] : executable === 'cmd.exe' ? [] : ['-NoLogo'];
+      const args = !isWindows ? ['-l'] : executable === 'cmd.exe' ? [] : ['-NoLogo', '-NoProfile'];
       const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' };
       if (process.platform === 'darwin') {
         // Without a UTF-8 locale, shell editing deletes bytes instead of accented characters.
