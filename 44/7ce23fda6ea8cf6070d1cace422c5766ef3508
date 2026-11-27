@@ -1,0 +1,40 @@
+main.cjs
+  s_7304d540f07e03::t_1d85d5170d9bdb 158-159
+  s_7304d540f07e03::t_3e0ad9226cd52a 129,165
+model.cjs
+  s_7304d540f07e03::t_3e0ad9226cd52a 5,20,30-33,66,197
+test/main.test.cjs
+  s_7304d540f07e03::t_3dfa4e6b7fdac2 24-39
+test/smoke.cjs
+  s_7304d540f07e03::t_3dfa4e6b7fdac2 186-197
+  s_7304d540f07e03::t_79e0891e75d401 203-208
+index.html
+  s_7304d540f07e03::t_3e0ad9226cd52a 220,238-245
+  s_7304d540f07e03::t_aa9f28f53ffe44 246-248
+renderer.js
+  s_7304d540f07e03::t_3e0ad9226cd52a 17,64-78,96,289-297,324,1700-1701,1708,1712-1716,1719,1732-1737,1745-1746
+styles.css
+  s_7304d540f07e03::t_3e0ad9226cd52a 1926
+test/model.test.cjs
+  s_7304d540f07e03::t_3dfa4e6b7fdac2 41-62
+preload.cjs
+  s_7304d540f07e03::t_3e0ad9226cd52a 6
+README.md
+  s_7304d540f07e03::t_d1b4aa773410a4 101,113-114
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "447ce23fda6ea8cf6070d1cace422c5766ef3508",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
