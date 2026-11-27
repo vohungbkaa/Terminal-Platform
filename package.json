@@ -37,6 +37,7 @@
       "*.js",
       "*.html",
       "*.css",
+      "fonts/**",
       "!test/**"
     ],
     "asarUnpack": [

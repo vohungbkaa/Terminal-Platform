@@ -37,11 +37,12 @@ if (platform === 'win32') {
 }
 assert.ok(fs.statSync(path.join(dist, `${product}-${version}-${platform === 'win32' ? 'win' : 'mac'}-${arch}.zip`)).size > 1048576);
 for (const file of ['main.cjs', 'preload.cjs', 'model.cjs', 'renderer.js', 'index.html', 'styles.css',
+  'fonts/FiraCode-VF.woff2', 'fonts/OFL.txt',
   'node_modules/@xterm/xterm/lib/xterm.js', 'node_modules/@xterm/xterm/css/xterm.css',
   'node_modules/@xterm/addon-fit/lib/addon-fit.js', 'node_modules/node-pty/lib/index.js']) {
   assert.ok(asar.statFile(archive, file).size > 0, file);
 }
-for (const file of ['main.cjs', 'model.cjs', 'renderer.js', 'index.html']) {
+for (const file of ['main.cjs', 'model.cjs', 'renderer.js', 'index.html', 'styles.css', 'fonts/FiraCode-VF.woff2']) {
   assert.deepEqual(asar.extractFile(archive, file), fs.readFileSync(path.join(__dirname, '..', file)), `Stale packaged file: ${file}`);
 }
 const prebuilds = path.join(resources, 'app.asar.unpacked/node_modules/node-pty/prebuilds', `${platform}-${arch}`);
