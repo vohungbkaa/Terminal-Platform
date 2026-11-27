@@ -1,0 +1,16 @@
+renderer.js
+  h_84f3d158cfb87f 66-73,75-76,1337-1338
+styles.css
+  h_84f3d158cfb87f 1955
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cf03eb8013a532969fb36271974d70357f7dd000",
+  "prompts": {},
+  "humans": {
+    "h_84f3d158cfb87f": {
+      "author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
