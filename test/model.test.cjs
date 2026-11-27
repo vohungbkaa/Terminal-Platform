@@ -38,6 +38,28 @@ test('default and selectable shells match the current platform', () => {
   }
 });
 
+test('Hacker theme and opacity persist while old settings remain valid', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'termanager-appearance-'));
+  try {
+    const state = model.defaults();
+    const file = path.join(directory, 'workspace.json');
+    assert.equal(state.settings.opacity, 100);
+    delete state.settings.opacity;
+    model.save(file, state);
+    assert.equal(model.load(file).settings.opacity, undefined);
+    state.settings.theme = 'hacker';
+    state.settings.opacity = 80;
+    model.save(file, state);
+    assert.deepEqual(model.load(file), state);
+    const saved = fs.readFileSync(file, 'utf8');
+    for (const value of [0, 39, 101, 75.5, '80', null, NaN, Infinity]) {
+      state.settings.opacity = value;
+      assert.throws(() => model.save(file, state));
+      assert.equal(fs.readFileSync(file, 'utf8'), saved);
+    }
+  } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});
+
 test('legacy macOS workspace selects zsh without losing layout or overwriting the original', { skip: process.platform !== 'darwin' }, () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'termanager-'));
   try {

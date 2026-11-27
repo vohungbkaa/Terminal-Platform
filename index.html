@@ -217,6 +217,7 @@
             <option value="obsidian">Obsidian</option>
             <option value="warmDusk">Warm Dusk</option>
             <option value="nordFrost">Nord Frost</option>
+            <option value="hacker">Hacker</option>
           </select>
         </section>
 
@@ -231,6 +232,17 @@
               <span class="font-unit mono">pt</span>
             </div>
             <div id="font-size-preview" class="font-preview mono">$ echo "Terminal Manager"  # 13pt</div>
+          </div>
+        </section>
+
+        <section class="settings-section">
+          <div class="settings-section-title">ĐỘ TRONG SUỐT</div>
+          <div class="settings-card">
+            <div class="font-slider-row">
+              <input id="app-opacity" type="range" min="40" max="100" step="1" value="100" aria-label="Độ đục ứng dụng" aria-describedby="opacity-hint">
+              <output id="opacity-value" for="app-opacity" class="mono">100%</output>
+            </div>
+            <p id="opacity-hint" class="field-hint">100% không trong suốt. Giảm để nhìn xuyên qua toàn bộ cửa sổ, bao gồm cả chữ.</p>
           </div>
         </section>
 

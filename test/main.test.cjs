@@ -21,3 +21,19 @@ test('PTY resize validates dimensions and skips unchanged sizes', () => {
   assert.throws(() => resize('pane', 120, 1.5));
   assert.equal(calls, 1);
 });
+
+test('window opacity converts validated percentages to native values', () => {
+  let changeOpacity;
+  const values = [];
+  const source = fs.readFileSync(path.join(__dirname, '..', 'main.cjs'), 'utf8');
+  vm.runInNewContext(source.slice(source.indexOf("    handle('window:opacity'"), source.indexOf("    handle('clipboard:copy'")), {
+    handle: (_channel, callback) => { changeOpacity = callback; },
+    model: require('../model.cjs'), window: { setOpacity: value => values.push(value) }
+  });
+  changeOpacity(75);
+  changeOpacity(100);
+  assert.deepEqual(values, [0.75, 1]);
+  assert.throws(() => changeOpacity(0));
+  assert.throws(() => changeOpacity('75'));
+  assert.equal(values.length, 2);
+});

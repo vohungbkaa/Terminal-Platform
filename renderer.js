@@ -14,7 +14,7 @@ const terminals = new Map();
 const pendingAgentLaunches = new Set();
 let activeModelPopover = null;
 
-// Exact 4 curated themes synced from native TerManager (Theme.swift)
+// The original four palettes plus a phosphor-green terminal theme.
 const themes = {
   graphite: {
     id: 'graphite', name: 'Graphite', subtitle: 'Linear / Raycast',
@@ -61,6 +61,21 @@ const themes = {
       '#594f48', '#f28f92', '#97d6ae', '#f2cc8a', '#94c2e6', '#dcafe0', '#92d9d4', '#faf6f2'
     ]
   },
+  hacker: {
+    id: 'hacker', name: 'Hacker', subtitle: 'Đen sâu · Xanh phosphor',
+    bg: '#020703', sidebarBg: 'rgba(3, 13, 5, 0.96)', toolbarBg: 'rgba(4, 17, 6, 0.96)',
+    surface: '#061009', elevated: '#0c1b10',
+    surfaceHover: 'rgba(120, 255, 70, 0.06)', surfaceActive: 'rgba(120, 255, 70, 0.12)',
+    border: 'rgba(120, 255, 70, 0.20)', borderStrong: 'rgba(120, 255, 70, 0.42)',
+    accent: '#7cff46', accentHover: '#b1ff88', accentSoft: 'rgba(124, 255, 70, 0.14)',
+    text: '#b8ffa0', textSecondary: '#8acb79', muted: '#598653',
+    success: '#7cff46', warning: '#e1e96b', danger: '#ff7777', info: '#80dfb0',
+    terminal: '#020703', terminalFg: '#a4ff78', cursor: '#7cff46',
+    ansi: [
+      '#07120a', '#ff7777', '#7cff46', '#e1e96b', '#68bda0', '#b7d777', '#80dfb0', '#b8ffa0',
+      '#56804e', '#ffaaaa', '#b1ff88', '#f1f7a1', '#98e2c4', '#d6f3a1', '#b0f8d5', '#e5ffd9'
+    ]
+  },
   nordFrost: {
     id: 'nordFrost', name: 'Nord Frost', subtitle: 'Xanh Bắc Âu',
     bg: '#191e28', sidebarBg: 'rgba(30, 36, 48, 0.94)', toolbarBg: 'rgba(30, 36, 48, 0.90)',
@@ -78,7 +93,7 @@ const themes = {
   }
 };
 
-const themeOrder = ['graphite', 'obsidian', 'warmDusk', 'nordFrost'];
+const themeOrder = ['graphite', 'obsidian', 'warmDusk', 'nordFrost', 'hacker'];
 
 // Crisp inline SVG icon helpers matching SF Symbols from native TerManager
 const ICONS = {
@@ -271,6 +286,15 @@ function renderThemeSwatches() {
   }
 }
 
+function previewTheme(themeId) {
+  const theme = applyThemeTokens(themeId);
+  for (const view of terminals.values()) {
+    if (view.themeId === theme.id) continue;
+    view.term.options.theme = xtermThemeFor(theme);
+    view.themeId = theme.id;
+  }
+}
+
 function renderSettingsThemeCards(selectedId) {
   const container = $('theme-cards');
   container.replaceChildren();
@@ -297,7 +321,7 @@ function renderSettingsThemeCards(selectedId) {
     `;
     card.addEventListener('click', () => {
       $('theme').value = id;
-      applyThemeTokens(id);
+      previewTheme(id);
       renderSettingsThemeCards(id);
     });
     container.append(card);
@@ -1673,19 +1697,26 @@ function openSettings() {
   $('shell').value = state.settings.shell;
   $('font-size').value = state.settings.fontSize;
   $('theme').value = state.settings.theme;
+  $('app-opacity').value = state.settings.opacity ?? 100;
+  $('opacity-value').textContent = `${state.settings.opacity ?? 100}%`;
   renderSettingsThemeCards(state.settings.theme);
   syncFontPreview(state.settings.fontSize);
   $('settings-dialog').showModal();
 }
 
 function closeSettings() {
-  applyThemeTokens(state.settings.theme);
+  resetSettingsPreview();
   $('settings-dialog').close();
+}
+
+function resetSettingsPreview() {
+  previewTheme(state.settings.theme);
+  api.setOpacity(state.settings.opacity ?? 100).catch(error);
 }
 
 $('settings-button').onclick = $('topbar-settings').onclick = openSettings;
 $('cancel-settings').onclick = $('cancel-settings-btn').onclick = closeSettings;
-$('settings-dialog').addEventListener('cancel', () => applyThemeTokens(state.settings.theme));
+$('settings-dialog').addEventListener('cancel', resetSettingsPreview);
 $('settings-dialog').addEventListener('click', event => {
   if (event.target === $('settings-dialog')) closeSettings();
 });
@@ -1698,6 +1729,12 @@ $('font-size').addEventListener('input', event => {
   syncFontPreview(event.target.value);
 });
 
+$('app-opacity').addEventListener('input', event => {
+  const value = Number(event.target.value);
+  $('opacity-value').textContent = `${value}%`;
+  api.setOpacity(value).catch(error);
+});
+
 $('settings-form').onsubmit = event => {
   event.preventDefault();
   act(async () => {
@@ -1705,7 +1742,8 @@ $('settings-form').onsubmit = event => {
       s.settings = {
         shell: $('shell').value,
         fontSize: Number($('font-size').value),
-        theme: $('theme').value
+        theme: $('theme').value,
+        opacity: Number($('app-opacity').value)
       };
     });
     $('settings-dialog').close();

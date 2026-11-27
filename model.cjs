@@ -2,7 +2,7 @@ const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const themes = ['graphite', 'obsidian', 'warmDusk', 'nordFrost'];
+const themes = ['graphite', 'obsidian', 'warmDusk', 'nordFrost', 'hacker'];
 const windowsShells = { 'powershell.exe': 'Windows PowerShell', 'pwsh.exe': 'PowerShell 7 (cần cài riêng)', 'cmd.exe': 'Command Prompt' };
 const shells = process.platform === 'win32' ? windowsShells : { '/bin/zsh': 'Zsh', '/bin/bash': 'Bash' };
 const defaultCommands = [
@@ -17,7 +17,7 @@ const defaultCommands = [
 function defaults() {
   return {
     version: 1, projects: [], panes: { home: [] }, selected: 'home',
-    settings: { fontSize: 13, theme: 'graphite', shell: Object.keys(shells)[0] },
+    settings: { fontSize: 13, theme: 'graphite', shell: Object.keys(shells)[0], opacity: 100 },
     commands: defaultCommands.map(item => ({ id: randomUUID(), ...item }))
   };
 }
@@ -25,6 +25,10 @@ function text(value, max = 4096) {
   if (typeof value !== 'string' || !value.trim() || value.length > max || value.includes('\0')) {
     throw new Error('Giá trị văn bản không hợp lệ.');
   }
+  return value;
+}
+function validateOpacity(value) {
+  if (!Number.isInteger(value) || value < 40 || value > 100) throw new Error('Độ đục phải từ 40 đến 100%.');
   return value;
 }
 function validate(state) {
@@ -59,6 +63,7 @@ function validate(state) {
   if (!state.settings || !themes.includes(state.settings.theme) ||
       !Number.isInteger(state.settings.fontSize) || state.settings.fontSize < 9 || state.settings.fontSize > 32 ||
       !Object.hasOwn(shells, state.settings.shell)) throw new Error('Thiết lập không hợp lệ.');
+  if (state.settings.opacity !== undefined) validateOpacity(state.settings.opacity);
   if (!Array.isArray(state.commands) || state.commands.length > 200) throw new Error('Danh sách lệnh không hợp lệ.');
   for (const command of state.commands) { text(command.id, 100); text(command.title, 200); text(command.command); }
   return state;
@@ -189,4 +194,4 @@ function detectAgentFromArgs(args) {
   return null;
 }
 
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder };
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder, validateOpacity };

@@ -3,6 +3,7 @@ contextBridge.exposeInMainWorld('desktop', {
   load: () => ipcRenderer.invoke('workspace:load'),
   agentModels: agent => ipcRenderer.invoke('agent:models', agent),
   save: state => ipcRenderer.invoke('workspace:save', state),
+  setOpacity: value => ipcRenderer.invoke('window:opacity', value),
   copy: data => ipcRenderer.invoke('clipboard:copy', data),
   paste: () => ipcRenderer.invoke('clipboard:paste'),
   folder: () => ipcRenderer.invoke('project:folder'),

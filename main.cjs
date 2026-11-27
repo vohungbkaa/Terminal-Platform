@@ -126,6 +126,7 @@ else {
     window = new BrowserWindow({
       title: 'TerManager-Platform', width: 1440, height: 900, minWidth: 900, minHeight: 580,
       backgroundColor: '#0e1015',
+      opacity: (state.settings.opacity ?? 100) / 100,
       ...(process.platform === 'darwin' ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 13 } } : {}),
       webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
     });
@@ -154,11 +155,14 @@ else {
     handle('workspace:save', async next => {
       model.save(stateFile, next);
       state = next;
+      const opacity = state.settings.opacity ?? 100;
+      if (Math.round(window.getOpacity() * 100) !== opacity) window.setOpacity(opacity / 100);
       for (const id of sessions.keys()) {
         try { model.findPane(state, id); } catch { stop(id); }
       }
       await Promise.all(stopping);
     });
+    handle('window:opacity', value => window.setOpacity(model.validateOpacity(value) / 100));
     handle('clipboard:copy', data => {
       if (typeof data !== 'string' || data.length > 1048576) throw new Error('Nội dung clipboard quá lớn.');
       clipboard.writeText(data);
