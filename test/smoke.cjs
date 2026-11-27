@@ -323,6 +323,27 @@ setInterval(() => {}, 1000);
         assert.equal(await run('state.projects.length'), projectCount + 1);
         assert.equal(await run('state.projects.find(p => p.id === state.selected).path'), path.join(temporary, 'Dự án mới'));
       } finally { dialog.showOpenDialog = originalOpenDialog; }
+      const liveWorkspace = path.join(temporary, 'Dự án mới');
+      await run("globalThis.liveProject = state.projects.find(project => project.name === 'Dự án mới'); document.querySelector(`.project-row[data-project-id=\"${liveProject.id}\"] .disclosure-rail`).click()");
+      fs.writeFileSync(path.join(liveWorkspace, 'new-live.txt'), 'new file');
+      fs.mkdirSync(path.join(liveWorkspace, 'live-folder'));
+      fs.writeFileSync(path.join(liveWorkspace, 'live-folder', 'child-live.txt'), 'child file');
+      await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'new-live.txt')");
+      await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'live-folder')");
+      await run("[...document.querySelectorAll('.file-row')].find(row => row.querySelector('.file-name').textContent === 'live-folder').click()");
+      await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'child-live.txt')");
+      fs.renameSync(path.join(liveWorkspace, 'new-live.txt'), path.join(liveWorkspace, 'renamed-live.txt'));
+      await waitFor("[...document.querySelectorAll('.file-name')].some(node => node.textContent === 'renamed-live.txt') && ![...document.querySelectorAll('.file-name')].some(node => node.textContent === 'new-live.txt')");
+      fs.unlinkSync(path.join(liveWorkspace, 'renamed-live.txt'));
+      fs.rmSync(path.join(liveWorkspace, 'live-folder'), { recursive: true });
+      await waitFor("![...document.querySelectorAll('.file-name')].some(node => ['renamed-live.txt', 'live-folder', 'child-live.txt'].includes(node.textContent))");
+      fs.writeFileSync(path.join(liveWorkspace, 'keep-on-disk.txt'), 'preserve workspace files');
+      await run("globalThis.originalConfirm = window.confirm; window.confirm = () => true; document.querySelector(`.project-row[data-project-id=\"${liveProject.id}\"] .row-action.danger`).click()");
+      await run('actionQueue');
+      await run('window.confirm = originalConfirm; void 0');
+      assert.equal(await run('state.projects.some(project => project.id === liveProject.id)'), false);
+      assert.equal(fs.readFileSync(path.join(liveWorkspace, 'keep-on-disk.txt'), 'utf8'), 'preserve workspace files');
+      assert.equal(model.load(path.join(temporary, 'workspace.json')).projects.some(project => project.path === liveWorkspace), false);
       window.webContents.debugger.attach('1.3');
       try {
         const count = await run('state.projects.length');

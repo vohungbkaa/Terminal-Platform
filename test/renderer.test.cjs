@@ -8,6 +8,76 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8'
 const context = vm.createContext({});
 vm.runInContext(source.slice(source.indexOf('function quoteDroppedPaths('), source.indexOf('function fit(')), context);
 
+test('expanded directories refresh changes and recover after errors without redundant renders', async () => {
+  const record = { entries: [], promise: null };
+  const cache = new Map([['project:', record]]);
+  let entries = [];
+  let failure;
+  let calls = 0;
+  let renders = 0;
+  const sidebar = { hidden: false };
+  const refresh = vm.createContext({
+    state: { projects: [{ id: 'project' }] }, directoryCache: cache,
+    $: () => sidebar,
+    document: { hidden: false, querySelectorAll: () => [{ dataset: { projectId: 'project', relative: '' } }] },
+    api: { listDirectory: async () => { calls++; if (failure) throw failure; return entries; } },
+    renderSidebar: () => { renders++; }
+  });
+  vm.runInContext(source.slice(source.indexOf('let directoryRefreshPending ='), source.indexOf('function renderSidebar(')), refresh);
+  await refresh.refreshDirectories();
+  assert.equal(renders, 0);
+  entries = [{ name: 'new.txt', relative: 'new.txt', directory: false }];
+  await refresh.refreshDirectories();
+  assert.equal(record.entries, entries);
+  assert.equal(renders, 1);
+  await refresh.refreshDirectories();
+  assert.equal(renders, 1);
+  entries = [];
+  await refresh.refreshDirectories();
+  assert.equal(renders, 2);
+  failure = new Error('Folder removed');
+  await refresh.refreshDirectories();
+  await refresh.refreshDirectories();
+  assert.equal(record.error, 'Folder removed');
+  assert.equal(renders, 3);
+  failure = null;
+  await refresh.refreshDirectories();
+  assert.equal(record.error, undefined);
+  assert.equal(renders, 4);
+  const before = calls;
+  sidebar.hidden = true;
+  await refresh.refreshDirectories();
+  sidebar.hidden = false;
+  refresh.document.hidden = true;
+  await refresh.refreshDirectories();
+  assert.equal(calls, before);
+});
+
+test('directory refresh skips concurrent loads and ignores results for removed workspaces', async () => {
+  const record = { entries: [] };
+  let complete;
+  let calls = 0;
+  const refresh = vm.createContext({
+    state: { projects: [{ id: 'project' }] }, directoryCache: new Map([['project:', record]]),
+    $: () => ({ hidden: false }),
+    document: { hidden: false, querySelectorAll: () => [{ dataset: { projectId: 'project', relative: '' } }] },
+    api: { listDirectory: () => { calls++; return new Promise(resolve => { complete = resolve; }); } },
+    renderSidebar: assert.fail
+  });
+  vm.runInContext(source.slice(source.indexOf('let directoryRefreshPending ='), source.indexOf('function renderSidebar(')), refresh);
+  record.promise = Promise.resolve();
+  await refresh.refreshDirectories();
+  assert.equal(calls, 0);
+  record.promise = null;
+  const first = refresh.refreshDirectories();
+  await refresh.refreshDirectories();
+  assert.equal(calls, 1);
+  refresh.state.projects = [];
+  complete([{ name: 'stale.txt' }]);
+  await first;
+  assert.deepEqual(record.entries, []);
+});
+
 test('sidebar captures drop paths before queuing and adds only validated folders', async () => {
   const handlers = new Map();
   const classes = new Set();

@@ -113,7 +113,7 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
   - Kéo thả một hoặc nhiều thư mục từ Finder/File Explorer vào sidebar để thêm workspace; thư mục đã có sẽ được chọn lại, file thường được bỏ qua khi thả cùng thư mục.
   - Tự động hiển thị ô lọc nhanh khi có từ 4 dự án trở lên.
   - Cây danh mục dự án & task có hướng dẫn đường kẻ dọc (tree-guide), icon phân loại SVG trực quan (`sparkles` cho AI tasks, `terminal` cho terminal tasks), đếm số lượng terminal đang chạy, thao tác sửa/xóa/thêm hiện mượt mà khi hover.
-  - Mũi tên cạnh project mở danh sách file và thư mục cấp đầu. Mỗi thư mục con chỉ tải khi mở, có thể thu lại; gập rồi mở lại để cập nhật danh sách, không quét đệ quy toàn bộ project. Chỉ duyệt trong thư mục project, kể cả khi đi qua symlink.
+  - Mũi tên cạnh project mở danh sách file và thư mục cấp đầu. Mỗi thư mục con chỉ tải khi mở, có thể thu lại. Các nhánh đang mở tự cập nhật mỗi giây khi tạo, xóa hoặc đổi tên file/thư mục trên ổ đĩa; ứng dụng cũng kiểm tra khi cửa sổ được focus lại. Tạm dừng kiểm tra khi cửa sổ bị ẩn hoặc sidebar thu gọn, không quét đệ quy toàn bộ project. Chỉ duyệt trong thư mục project, kể cả khi đi qua symlink.
   - Kéo project, thư mục con hoặc file từ sidebar vào chat agent/terminal để chèn đường dẫn; không tự gửi Enter.
   - Nhấp đúp vào file trong cây workspace (hoặc chọn file rồi nhấn Enter) để mở bằng ứng dụng mặc định của hệ điều hành: HTML/HTM mở bằng trình duyệt mặc định, DOCX, XLS/XLSX và các loại file khác mở bằng ứng dụng tương ứng trên máy.
   - Thanh footer gắn bộ 5 chấm chọn giao diện nhanh (Theme Swatches) cùng nút mở Thiết lập.

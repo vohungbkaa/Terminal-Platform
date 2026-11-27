@@ -967,6 +967,8 @@ function renderDirectory(project, relative = '') {
   const key = `${project.id}:${relative}`;
   const tree = document.createElement('div');
   tree.className = 'directory-tree';
+  tree.dataset.projectId = project.id;
+  tree.dataset.relative = relative;
   let record = directoryCache.get(key);
   if (!record) {
     record = {};
@@ -1024,6 +1026,39 @@ function renderDirectory(project, relative = '') {
     if (entry.directory && expanded) tree.append(renderDirectory(project, entry.relative));
   }
   return tree;
+}
+
+let directoryRefreshPending = false;
+async function refreshDirectories() {
+  if (!state || directoryRefreshPending || document.hidden || $('sidebar').hidden) return;
+  directoryRefreshPending = true;
+  let changed = false;
+  try {
+    await Promise.all([...document.querySelectorAll('.directory-tree')].map(async tree => {
+      const { projectId, relative } = tree.dataset;
+      const key = `${projectId}:${relative}`;
+      const record = directoryCache.get(key);
+      if (!record || record.promise) return;
+      let entries, reason;
+      try { entries = await api.listDirectory(projectId, relative); }
+      catch (failure) { reason = failure?.message || 'Không đọc được thư mục.'; }
+      if (directoryCache.get(key) !== record || !state.projects.some(project => project.id === projectId)) return;
+      if (record.error === reason && JSON.stringify(record.entries) === JSON.stringify(entries)) return;
+      record.entries = entries;
+      record.error = reason;
+      changed = true;
+    }));
+    if (changed) {
+      const focused = document.activeElement?.closest('.file-row');
+      renderSidebar();
+      if (focused) {
+        const replacement = [...document.querySelectorAll('.file-row')].find(row =>
+          row.dataset.projectId === focused.dataset.projectId && row.dataset.relative === focused.dataset.relative);
+        const projectRow = [...document.querySelectorAll('.project-row')].find(row => row.dataset.projectId === focused.dataset.projectId);
+        (replacement || projectRow?.querySelector('.disclosure-rail'))?.focus({ preventScroll: true });
+      }
+    }
+  } finally { directoryRefreshPending = false; }
 }
 
 function renderSidebar() {
@@ -1988,6 +2023,9 @@ document.addEventListener('keydown', event => {
   if (key === ',') { event.preventDefault(); openSettings(); }
   if (key === '\\') { event.preventDefault(); $('toggle-sidebar').click(); }
 });
+
+setInterval(() => { refreshDirectories().catch(error); }, 1000);
+window.addEventListener('focus', () => { refreshDirectories().catch(error); });
 
 act(async () => {
   const loaded = await api.load();
