@@ -9,15 +9,18 @@ DEST_APP="/Applications/$APP_NAME"
 RUN_TESTS=false
 INSTALL_APP=true
 OPEN_APP=true
+FULL_DIST=false
 
 for arg in "$@"; do
   case "$arg" in
     --test) RUN_TESTS=true ;;
+    --dist) FULL_DIST=true ;;
     --no-install) INSTALL_APP=false; OPEN_APP=false ;;
     --no-open) OPEN_APP=false ;;
     -h|--help)
-      echo "Sử dụng: ./build-mac.sh [--test] [--no-install] [--no-open]"
+      echo "Sử dụng: ./build-mac.sh [--test] [--dist] [--no-install] [--no-open]"
       echo "  --test        Chạy unit/smoke/unicode test trước khi build"
+      echo "  --dist        Đóng gói cả file .dmg và .zip (cho phân phối)"
       echo "  --no-install  Chỉ build vào dist/, không cài vào /Applications"
       echo "  --no-open     Cài vào /Applications nhưng không tự mở app"
       exit 0
@@ -36,8 +39,13 @@ if [ "$RUN_TESTS" = true ]; then
   npm run test:unicode
 fi
 
-echo "▶ Đang build $APP_NAME cho macOS..."
-npm run dist:mac
+echo "▶ Đang đóng gói $APP_NAME cho macOS..."
+if [ "$FULL_DIST" = true ]; then
+  npm run dist:mac
+else
+  # Build trực tiếp thư mục .app (nhanh, không cần tải dmg-builder/7zip từ GitHub và không cần mạng)
+  npx electron-builder --mac --dir -c.publish=null
+fi
 
 ARCH="$(uname -m)"
 if [ "$ARCH" = "arm64" ] && [ -d "$SCRIPT_DIR/dist/mac-arm64/$APP_NAME" ]; then

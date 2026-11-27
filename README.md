@@ -24,11 +24,14 @@ Windows dùng Windows PowerShell, PowerShell 7 hoặc CMD. PowerShell 7 cần đ
 Dự án đã có script tự động [build-mac.sh](build-mac.sh) giúp build, đóng app cũ và cài đặt đè trực tiếp vào `/Applications/TerManager-Platform.app`:
 
 ```sh
-# Build, cài đặt vào /Applications và tự động mở app
+# Build nhanh, cài đặt vào /Applications và tự động mở app (chỉ mất ~10 giây)
 ./build-mac.sh
 
 # Chạy toàn bộ test (unit, smoke, unicode) trước khi build & cài đặt
 ./build-mac.sh --test
+
+# Đóng gói đầy đủ cả file .dmg và .zip cho phân phối (nằm trong thư mục dist/)
+./build-mac.sh --dist
 
 # Chỉ build ra thư mục dist/, không ghi đè vào /Applications
 ./build-mac.sh --no-install

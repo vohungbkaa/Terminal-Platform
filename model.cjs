@@ -5,11 +5,20 @@ const path = require('node:path');
 const themes = ['graphite', 'obsidian', 'warmDusk', 'nordFrost'];
 const windowsShells = { 'powershell.exe': 'Windows PowerShell', 'pwsh.exe': 'PowerShell 7 (cần cài riêng)', 'cmd.exe': 'Command Prompt' };
 const shells = process.platform === 'win32' ? windowsShells : { '/bin/zsh': 'Zsh', '/bin/bash': 'Bash' };
+const defaultCommands = [
+  { title: 'agy • Default', command: 'agy' },
+  { title: 'agy • Skip permissions', command: 'agy --dangerously-skip-permissions' },
+  { title: 'codex • Default', command: 'codex' },
+  { title: 'codex • Bypass approvals', command: 'codex --dangerously-bypass-approvals-and-sandbox' },
+  { title: 'claude • Default', command: 'claude' },
+  { title: 'claude • Skip permissions', command: 'claude --dangerously-skip-permissions' },
+  { title: 'gemini • Default', command: 'gemini' }
+];
 function defaults() {
   return {
     version: 1, projects: [], panes: { home: [] }, selected: 'home',
     settings: { fontSize: 13, theme: 'graphite', shell: Object.keys(shells)[0] },
-    commands: ['agy', 'codex', 'claude', 'gemini'].map(command => ({ id: randomUUID(), title: command, command }))
+    commands: defaultCommands.map(item => ({ id: randomUUID(), ...item }))
   };
 }
 function text(value, max = 4096) {
@@ -64,11 +73,20 @@ function findPane(state, id) {
   }
   throw new Error('Terminal không tồn tại.');
 }
+function isLegacyDefaultCommands(commands) {
+  if (!Array.isArray(commands) || commands.length !== 4) return false;
+  const legacy = ['agy', 'codex', 'claude', 'gemini'];
+  return commands.every((item, i) => item && item.title === legacy[i] && item.command === legacy[i]);
+}
 function load(file) {
   try {
     const state = JSON.parse(fs.readFileSync(file, 'utf8'));
     // Earlier desktop builds stored a Windows shell even when running on macOS.
     if (process.platform === 'darwin' && Object.hasOwn(windowsShells, state?.settings?.shell)) state.settings.shell = '/bin/zsh';
+    // Upgrade legacy bare default commands to the full preset set.
+    if (isLegacyDefaultCommands(state?.commands)) {
+      state.commands = defaultCommands.map(item => ({ id: randomUUID(), ...item }));
+    }
     return validate(state);
   }
   catch (error) { if (error.code === 'ENOENT') return defaults(); throw error; }

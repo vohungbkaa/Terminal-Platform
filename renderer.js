@@ -417,21 +417,50 @@ function render() {
   }
 }
 
+function agentMetaFor(preset) {
+  const cmdFirst = (preset.command || '').trim().split(/\s+/)[0]?.toLowerCase() || '';
+  const lower = `${preset.title} ${preset.command}`.toLowerCase();
+  if (cmdFirst === 'agy' || lower.includes('antigravity') || lower.startsWith('agy')) {
+    return { key: 'agy', name: 'Antigravity', tag: 'agy', icon: ICONS.bolt, tint: '#5e9bff' };
+  }
+  if (cmdFirst === 'codex' || lower.includes('codex') || lower.includes('openai')) {
+    return { key: 'codex', name: 'Codex', tag: 'codex', icon: ICONS.terminal, tint: '#38bdf8' };
+  }
+  if (cmdFirst === 'claude' || lower.includes('claude')) {
+    return { key: 'claude', name: 'Claude Code', tag: 'claude', icon: ICONS.sparkles, tint: '#e59853' };
+  }
+  if (cmdFirst === 'gemini' || lower.includes('gemini')) {
+    return { key: 'gemini', name: 'Gemini', tag: 'gemini', icon: ICONS.sparkles, tint: '#a78bfa' };
+  }
+  return { key: 'custom', name: 'Tùy chỉnh', tag: 'custom', icon: ICONS.terminal, tint: '#34d399' };
+}
+
+function groupCommands(commands) {
+  const map = new Map();
+  for (const preset of commands) {
+    const meta = agentMetaFor(preset);
+    if (!map.has(meta.key)) map.set(meta.key, { ...meta, items: [] });
+    map.get(meta.key).items.push(preset);
+  }
+  return [...map.values()];
+}
+
 function renderLaunchpadAgents() {
   const container = $('launchpad-agents');
   container.replaceChildren();
-  for (const preset of state.commands.slice(0, 4)) {
-    const tint = agentTint(preset.title + ' ' + preset.command);
+  for (const group of groupCommands(state.commands).slice(0, 4)) {
+    const preferred = group.items[group.items.length - 1] || group.items[0];
+    if (!preferred) continue;
     const pill = document.createElement('button');
     pill.type = 'button';
     pill.className = 'agent-quick-pill';
-    pill.style.setProperty('--pill-tint', tint);
-    pill.title = preset.command;
-    pill.innerHTML = ICONS.bolt;
+    pill.style.setProperty('--pill-tint', group.tint);
+    pill.title = preferred.command;
+    pill.innerHTML = group.icon;
     const text = document.createElement('span');
-    text.textContent = preset.title;
+    text.textContent = group.name;
     pill.append(text);
-    pill.addEventListener('click', act(() => newTerminal(preset.command, preset.title)));
+    pill.addEventListener('click', act(() => newTerminal(preferred.command, preferred.title)));
     container.append(pill);
   }
 }
@@ -665,54 +694,72 @@ function renderSidebar() {
 function renderCommands() {
   const list = $('commands');
   list.replaceChildren();
-  for (const preset of state.commands) {
-    const tint = agentTint(preset.title + ' ' + preset.command);
-    const row = document.createElement('div');
-    row.className = 'command-row';
-    row.style.setProperty('--cmd-tint', tint);
-    row.draggable = true;
-    row.title = `Kéo thả vào Terminal để chạy • Hoặc nhấn để mở Terminal mới\n${preset.command}`;
-    row.addEventListener('dragstart', event => {
-      event.dataTransfer.setData('application/x-termanager-command', preset.command);
-      event.dataTransfer.setData('application/x-termanager-title', preset.title);
-    });
-    row.addEventListener('dragend', () => {
-      if (!agentDrawerPinned && !isHoveringAgentDrawer) scheduleHideAgentDrawer();
-    });
+  for (const group of groupCommands(state.commands)) {
+    const section = document.createElement('div');
+    section.className = 'command-group';
 
-    row.insertAdjacentHTML('beforeend', ICONS.grip);
+    const header = document.createElement('div');
+    header.className = 'command-group-header';
+    header.style.setProperty('--group-tint', group.tint);
+    header.innerHTML = `${group.icon}<span class="command-group-name"></span><span class="command-group-tag"></span>`;
+    header.querySelector('.command-group-name').textContent = group.name;
+    header.querySelector('.command-group-tag').textContent = group.tag;
+    section.append(header);
 
-    const launch = document.createElement('button');
-    launch.type = 'button';
-    launch.className = 'command-launch';
-    const titleEl = document.createElement('strong');
-    titleEl.textContent = preset.title;
-    const cmdEl = document.createElement('small');
-    cmdEl.textContent = preset.command;
-    launch.append(titleEl, cmdEl);
-    launch.addEventListener('click', act(() => newTerminal(preset.command, preset.title)));
-    row.append(launch);
-
-    const actions = document.createElement('div');
-    actions.className = 'command-actions';
-    actions.append(
-      iconButton(ICONS.pencil, 'Sửa lệnh', async () => {
-        const result = await ask('Sửa lệnh', preset.title, preset.command);
-        if (result) {
-          await update(s => {
-            Object.assign(s.commands.find(c => c.id === preset.id), { title: result.name, command: result.command });
-          });
-        }
+    for (const preset of group.items) {
+      const row = document.createElement('div');
+      row.className = 'command-row';
+      row.style.setProperty('--cmd-tint', group.tint);
+      row.draggable = true;
+      row.title = `Kéo thả vào Terminal để chạy • Hoặc nhấn để mở Terminal mới\n${preset.command}`;
+      row.addEventListener('dragstart', event => {
+        event.dataTransfer.setData('application/x-termanager-command', preset.command);
+        event.dataTransfer.setData('application/x-termanager-title', preset.title);
+      });
+      row.addEventListener('dragend', () => {
         if (!agentDrawerPinned && !isHoveringAgentDrawer) scheduleHideAgentDrawer();
-      }, 'row-action'),
-      iconButton(ICONS.close, 'Xóa lệnh', async () => {
-        if (confirm(`Xóa lệnh “${preset.title}”?`)) {
-          await update(s => { s.commands = s.commands.filter(c => c.id !== preset.id); });
-        }
-      }, 'row-action danger')
-    );
-    row.append(actions);
-    list.append(row);
+      });
+
+      row.insertAdjacentHTML('beforeend', ICONS.grip);
+
+      const launch = document.createElement('button');
+      launch.type = 'button';
+      launch.className = 'command-launch';
+      const titleEl = document.createElement('strong');
+      // Strip redundant "tag • " prefix inside grouped section for cleaner display
+      const prefix = `${group.tag} • `;
+      titleEl.textContent = preset.title.toLowerCase().startsWith(prefix)
+        ? preset.title.slice(prefix.length)
+        : preset.title;
+      const cmdEl = document.createElement('small');
+      cmdEl.textContent = preset.command;
+      launch.append(titleEl, cmdEl);
+      launch.addEventListener('click', act(() => newTerminal(preset.command, preset.title)));
+      row.append(launch);
+
+      const actions = document.createElement('div');
+      actions.className = 'command-actions';
+      actions.append(
+        iconButton(ICONS.pencil, 'Sửa lệnh', async () => {
+          const result = await ask('Sửa lệnh', preset.title, preset.command);
+          if (result) {
+            await update(s => {
+              Object.assign(s.commands.find(c => c.id === preset.id), { title: result.name, command: result.command });
+            });
+          }
+          if (!agentDrawerPinned && !isHoveringAgentDrawer) scheduleHideAgentDrawer();
+        }, 'row-action'),
+        iconButton(ICONS.close, 'Xóa lệnh', async () => {
+          if (confirm(`Xóa lệnh “${preset.title}”?`)) {
+            await update(s => { s.commands = s.commands.filter(c => c.id !== preset.id); });
+          }
+        }, 'row-action danger')
+      );
+      row.append(actions);
+      section.append(row);
+    }
+
+    list.append(section);
   }
 }
 
@@ -915,13 +962,21 @@ $('collapse-sidebar').onclick = () => setSidebarCollapsed(true);
 
 function updateAgentDrawerUI() {
   const isShown = agentDrawerVisible || agentDrawerPinned;
-  $('commands-panel').classList.toggle('open', isShown);
+  const panel = $('commands-panel');
+  panel.classList.toggle('open', isShown);
+  panel.classList.toggle('pinned', agentDrawerPinned);
+  document.querySelector('.stage-body').classList.toggle('agent-pinned', agentDrawerPinned);
   $('agent-hover-trigger').classList.toggle('hidden-trigger', isShown);
   $('commands-button').classList.toggle('active', isShown);
   $('pin-commands').classList.toggle('active', agentDrawerPinned);
   $('pin-commands').title = agentDrawerPinned
     ? 'Bỏ ghim (tự ẩn khi rời chuột)'
     : 'Ghim cố định bảng lệnh';
+  requestAnimationFrame(() => {
+    for (const view of terminals.values()) {
+      if (!view.node.hidden) fit(view);
+    }
+  });
 }
 
 function openAgentDrawer() {
