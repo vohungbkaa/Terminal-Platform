@@ -1,0 +1,44 @@
+main.cjs
+  s_7304d540f07e03::t_5fcc6d53fe5bd5 183
+model.cjs
+  s_7304d540f07e03::t_5fcc6d53fe5bd5 120,126-133,135-137,151,229
+  s_7304d540f07e03::t_b82219cf75b56f 121-125,134,138-150
+README.md
+  s_7304d540f07e03::t_d8fac4969124fc 101-102
+test/model.test.cjs
+  s_7304d540f07e03::t_b82219cf75b56f 30-35
+  s_7304d540f07e03::t_c07bb721de458a 8-29,36-39
+renderer.js
+  s_7304d540f07e03::t_5fcc6d53fe5bd5 12-13,101
+  s_7304d540f07e03::t_6f8c9f1f329d1b 943-959,964-975,977-999,1002-1018,1096,1102-1103,1141,1231-1232,1334,1340-1343
+  s_7304d540f07e03::t_c07bb721de458a 976
+  s_7304d540f07e03::t_b87abffa7dbfc8 1544,1552,1554,1835,1840,1853,1855,1859
+  s_7304d540f07e03::t_4e31fe38581362 960-963,1000-1001
+  s_7304d540f07e03::t_eba8998fdb7997 1105-1112
+  s_7304d540f07e03::t_4aeaf3b2e3ba43 1104
+  s_7304d540f07e03::t_88f84ff4858c8b 1344
+styles.css
+  s_7304d540f07e03::t_c07bb721de458a 397-412,414-418
+  s_7304d540f07e03::t_4e31fe38581362 413
+preload.cjs
+  s_7304d540f07e03::t_5fcc6d53fe5bd5 12
+test/smoke.cjs
+  s_7304d540f07e03::t_eba8998fdb7997 9-11,35,38-50,52-53
+  s_7304d540f07e03::t_7ce4e54156349f 36-37,51,99-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6d765eb20240e3e4a322331fcc85d160ac8a3cbd",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
