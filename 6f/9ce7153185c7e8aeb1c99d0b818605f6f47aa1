@@ -1,0 +1,34 @@
+test/package.cjs
+  s_7304d540f07e03::t_51098922628c75 40,45
+renderer.js
+  s_7304d540f07e03::t_51098922628c75 1335,1337,1767-1768
+index.html
+  s_7304d540f07e03::t_51098922628c75 8
+README.md
+  s_7304d540f07e03::t_bbff546e0022b4 121-122
+fonts/OFL.txt
+  s_7304d540f07e03::t_4bd2e464f31524 1-93
+styles.css
+  s_7304d540f07e03::t_51098922628c75 1-8,33,1963
+package.json
+  s_7304d540f07e03::t_51098922628c75 40
+test/smoke.cjs
+  s_7304d540f07e03::t_bbff546e0022b4 40,193
+  s_7304d540f07e03::t_51098922628c75 39,41-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6f9ce7153185c7e8aeb1c99d0b818605f6f47aa1",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
