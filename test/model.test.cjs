@@ -5,6 +5,23 @@ const os = require('node:os');
 const path = require('node:path');
 const model = require('../model.cjs');
 
+test('createFolder creates a real Unicode directory and rejects traversal and existing paths', async () => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'termanager-folder-'));
+  try {
+    const folder = await model.createFolder(parent, 'Dự án mới');
+    assert.deepEqual(folder, { name: 'Dự án mới', path: path.join(parent, 'Dự án mới') });
+    assert.equal(fs.statSync(folder.path).isDirectory(), true);
+    fs.writeFileSync(path.join(folder.path, 'keep.txt'), 'keep');
+    await assert.rejects(model.createFolder(parent, folder.name), { code: 'EEXIST' });
+    assert.equal(fs.readFileSync(path.join(folder.path, 'keep.txt'), 'utf8'), 'keep');
+    for (const name of ['.', '..', '../escape', 'nested/folder', 'nested\\folder', 'bad\nname', '']) {
+      await assert.rejects(model.createFolder(parent, name));
+    }
+    await assert.rejects(model.createFolder('relative/path', 'new-folder'));
+    assert.deepEqual(fs.readdirSync(parent), ['Dự án mới']);
+  } finally { fs.rmSync(parent, { recursive: true, force: true }); }
+});
+
 test('default and selectable shells match the current platform', () => {
   const state = model.defaults();
   assert.equal(state.settings.shell, process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');

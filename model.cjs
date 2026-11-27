@@ -101,6 +101,17 @@ function save(file, state) {
   fs.renameSync(temporary, file);
 }
 const AGENT_RUNNERS = new Set(['env', 'node', 'nodejs', 'bun', 'deno', 'npx', 'pnpx', 'python', 'python3', 'sh', 'bash', 'zsh']);
+
+async function createFolder(parent, name) {
+  text(parent);
+  text(name, 200);
+  if (!path.isAbsolute(parent) || name === '.' || name === '..' || /[/\\\x00-\x1f]/.test(name)) {
+    throw new Error('Đường dẫn hoặc tên thư mục không hợp lệ.');
+  }
+  const directory = path.join(parent, name);
+  await fs.promises.mkdir(directory);
+  return { path: directory, name };
+}
 const AGENT_BINARIES = new Map([
   ['claude', 'claude'],
   ['claude-code', 'claude'],
@@ -178,4 +189,4 @@ function detectAgentFromArgs(args) {
   return null;
 }
 
-module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels };
+module.exports = { defaults, validate, entityPath, findPane, load, save, text, shells, detectAgentFromArgs, extractModelFlag, parseAgentModels, parseCodexModels, createFolder };

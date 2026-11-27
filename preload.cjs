@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktop', {
   copy: data => ipcRenderer.invoke('clipboard:copy', data),
   paste: () => ipcRenderer.invoke('clipboard:paste'),
   folder: () => ipcRenderer.invoke('project:folder'),
+  createFolder: name => ipcRenderer.invoke('project:create-folder', name),
   start: id => ipcRenderer.invoke('terminal:start', id),
   input: (id, data) => ipcRenderer.invoke('terminal:input', id, data),
   resize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', id, cols, rows),

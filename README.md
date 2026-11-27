@@ -94,7 +94,8 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
 
 - **Thanh tiêu đề & Cửa sổ macOS**: Titlebar ẩn viền (`hiddenInset`), căn lề chuẩn nút đèn giao thông (traffic lights) của macOS, giữ nguyên viền tiêu đề chuẩn trên Windows.
 - **Thanh bên (Sidebar) kiểu Arc / Linear**:
-  - Hỗ trợ kéo thay đổi chiều rộng sidebar qua thanh chia hairline mỏng.
+  - Kéo thanh chia để thay đổi chiều rộng sidebar đến sát mép cửa sổ, không giới hạn cố định 340px.
+  - Nút thư mục có dấu **+** tạo thư mục thật trên ổ đĩa: nhập tên, chọn nơi lưu; thư mục mới được thêm thành project. Nút **+** bên cạnh vẫn thêm thư mục đã có.
   - Tự động hiển thị ô lọc nhanh khi có từ 4 dự án trở lên.
   - Cây danh mục dự án & task có hướng dẫn đường kẻ dọc (tree-guide), icon phân loại SVG trực quan (`sparkles` cho AI tasks, `terminal` cho terminal tasks), đếm số lượng terminal đang chạy, thao tác sửa/xóa/thêm hiện mượt mà khi hover.
   - Thanh footer gắn bộ 4 chấm chọn giao diện nhanh (Theme Swatches) cùng nút mở Thiết lập.

@@ -1458,9 +1458,7 @@ api.onExit((id, code) => {
 });
 
 // Sidebar & Topbar interactions
-$('add-project').onclick = act(async () => {
-  const folder = await api.folder();
-  if (!folder) return;
+async function addProject(folder) {
   const existing = state.projects.find(p =>
     platform === 'win32' ? p.path.toLowerCase() === folder.path.toLowerCase() : p.path === folder.path
   );
@@ -1472,6 +1470,19 @@ $('add-project').onclick = act(async () => {
     }
     s.selected = id;
   });
+}
+
+$('add-project').onclick = act(async () => {
+  const folder = await api.folder();
+  if (folder) await addProject(folder);
+});
+
+$('create-folder').onclick = act(async () => {
+  if (state.projects.length >= 200) throw new Error('Workspace đã có 200 project.');
+  const result = await ask('Tên thư mục mới', 'Thư mục mới');
+  if (!result) return;
+  const folder = await api.createFolder(result.name);
+  if (folder) await addProject(folder);
 });
 
 $('new-terminal').onclick = $('empty-new').onclick = act(() => newTerminal());
@@ -1630,7 +1641,7 @@ resizer.addEventListener('mousedown', event => {
   const startX = event.clientX;
   const startWidth = $('sidebar').getBoundingClientRect().width;
   const onMove = moveEvent => {
-    const next = Math.min(340, Math.max(185, startWidth + (moveEvent.clientX - startX)));
+    const next = Math.min(window.innerWidth - resizer.offsetWidth, Math.max(185, startWidth + (moveEvent.clientX - startX)));
     document.documentElement.style.setProperty('--sidebar-width', `${next}px`);
   };
   const onUp = () => {

@@ -1,5 +1,5 @@
 // Run using Electron so this checks the actual renderer, preload bridge, PTY and packaged terminal libraries.
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -28,6 +28,11 @@ app.on('browser-window-created', (_event, window) => {
       assert.equal(await run('state.settings.shell'), process.platform === 'win32' ? 'powershell.exe' : '/bin/zsh');
       assert.deepEqual(await run("Array.from(document.getElementById('shell').options, option => option.value)"), Object.keys(model.shells));
       assert.deepEqual(await run('Array.from({length: 10}, (_, i) => grid(i))'), [[1,1],[1,1],[1,2],[2,2],[2,2],[2,3],[2,3],[3,3],[3,3],[3,3]]);
+      await run("(() => { const handle = document.getElementById('sidebar-resizer'); const width = document.getElementById('sidebar').getBoundingClientRect().width; handle.dispatchEvent(new MouseEvent('mousedown', { clientX: width, bubbles: true })); window.dispatchEvent(new MouseEvent('mousemove', { clientX: 800 })); window.dispatchEvent(new MouseEvent('mouseup')); })()");
+      assert.equal(await run("document.getElementById('sidebar').getBoundingClientRect().width"), 800);
+      await run("document.documentElement.style.setProperty('--sidebar-width', '99999px')");
+      assert.equal(await run("document.getElementById('sidebar-resizer').getBoundingClientRect().right <= window.innerWidth"), true);
+      await run("document.documentElement.style.setProperty('--sidebar-width', '232px')");
       await run("document.getElementById('new-terminal').click()");
       await waitFor("terminals.size === 1 && [...terminals.values()][0].running");
       assert.equal(await run("document.querySelector('.pane-model-btn').hidden"), true);
@@ -196,6 +201,34 @@ setInterval(() => {}, 1000);
         await run("window.desktop.input(state.panes.home[1].id, 'exit\\r')");
         await waitFor("!terminals.get(state.panes.home[1].id).running");
       }
+      const originalOpenDialog = dialog.showOpenDialog;
+      let parentSelections = 0;
+      dialog.showOpenDialog = async () => { parentSelections++; return { canceled: true, filePaths: [] }; };
+      try {
+        const projectCount = await run('state.projects.length');
+        await run("document.getElementById('create-folder').click()");
+        await waitFor("document.getElementById('text-dialog').open");
+        await run("document.getElementById('cancel-text').click()");
+        await run('actionQueue');
+        assert.equal(parentSelections, 0);
+        await run("document.getElementById('create-folder').click()");
+        await waitFor("document.getElementById('text-dialog').open");
+        await run("document.getElementById('text-value').value = 'Canceled folder'; document.getElementById('text-form').requestSubmit()");
+        await run('actionQueue');
+        assert.equal(await run('state.projects.length'), projectCount);
+        assert.equal(fs.existsSync(path.join(temporary, 'Canceled folder')), false);
+        dialog.showOpenDialog = async (_window, options) => {
+          assert.equal(options.title, 'Chọn nơi tạo thư mục');
+          return { canceled: false, filePaths: [temporary] };
+        };
+        await run("document.getElementById('create-folder').click()");
+        await waitFor("document.getElementById('text-dialog').open");
+        await run("document.getElementById('text-value').value = 'Dự án mới'; document.getElementById('text-form').requestSubmit()");
+        await run('actionQueue');
+        assert.equal(fs.statSync(path.join(temporary, 'Dự án mới')).isDirectory(), true);
+        assert.equal(await run('state.projects.length'), projectCount + 1);
+        assert.equal(await run('state.projects.find(p => p.id === state.selected).path'), path.join(temporary, 'Dự án mới'));
+      } finally { dialog.showOpenDialog = originalOpenDialog; }
       await run("act(() => update(s => { s.panes = {home: []}; s.projects = []; s.selected = 'home'; }))()");
       await waitFor('terminals.size === 0');
       assert.equal(await run("document.getElementById('error').hidden"), true);

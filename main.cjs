@@ -170,6 +170,12 @@ else {
       const directory = result.filePaths[0];
       return { path: directory, name: path.basename(directory) };
     });
+    handle('project:create-folder', async name => {
+      model.text(name, 200);
+      const result = await dialog.showOpenDialog(window, { title: 'Chọn nơi tạo thư mục', properties: ['openDirectory'] });
+      if (result.canceled) return null;
+      return model.createFolder(result.filePaths[0], name);
+    });
     handle('terminal:start', id => {
       model.text(id, 100);
       const entity = model.findPane(state, id);
