@@ -1,0 +1,25 @@
+renderer.js
+  s_7304d540f07e03::t_0e83cecd49dbce 1337,1768
+styles.css
+  s_7304d540f07e03::t_0e83cecd49dbce 1963
+README.md
+  s_7304d540f07e03::t_0e83cecd49dbce 121
+test/smoke.cjs
+  s_7304d540f07e03::t_0e83cecd49dbce 39,42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "79d58260c6d88571ff55c6f1610e29e5d44be442",
+  "prompts": {},
+  "sessions": {
+    "s_7304d540f07e03": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a21bf3-b6d1-7f60-98ac-f2fca90434a4",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "vvhung <vvhung@mdc.misa.com.vn>"
+    }
+  }
+}
