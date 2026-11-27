@@ -1334,7 +1334,7 @@ function makeTerminal(pane) {
     cursorBlink: true,
     fontFamily: getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim(),
     fontSize: state.settings.fontSize,
-    fontWeight: '600',
+    fontWeight: '500',
     fontWeightBold: '700',
     scrollback: 5000,
     theme: xtermThemeFor(t),
@@ -1765,7 +1765,7 @@ document.addEventListener('keydown', event => {
 act(async () => {
   const loaded = await api.load();
   // Load the bundled font before xterm measures its character grid.
-  await document.fonts.load('600 13px "Fira Code"').catch(error);
+  await document.fonts.load('500 13px "Fira Code"').catch(error);
   ({ state, home, platform } = loaded);
   document.body.classList.add(`platform-${platform}`);
   $('platform-label').textContent = `${platform === 'darwin' ? 'macOS' : 'Windows'} · ${loaded.arch} · Glass & Graphite`;

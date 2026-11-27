@@ -118,7 +118,7 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
 
 ## Nhập tiếng Việt trên Mac
 
-Terminal dùng Fira Code 6.2 đi kèm ứng dụng, chữ thường semibold 600 và chữ đậm 700. Font được nạp trước khi đo lưới ký tự; không cần cài font riêng. Giấy phép SIL Open Font License nằm trong `fonts/OFL.txt`.
+Terminal dùng Fira Code 6.2 đi kèm ứng dụng, chữ thường medium 500 và chữ đậm 700. Font được nạp trước khi đo lưới ký tự; không cần cài font riêng. Giấy phép SIL Open Font License nằm trong `fonts/OFL.txt`.
 
 Từ bản 1.0.1, terminal trên Mac tự chọn locale UTF-8 nếu ứng dụng được mở với locale trống hoặc `C`/ASCII. Locale UTF-8 có sẵn được giữ lại. Điều này tránh lỗi xóa một phần byte của ký tự có dấu khi bộ gõ thay dấu hoặc khi bấm Backspace. Cần thoát rồi mở lại ứng dụng sau khi cập nhật để các shell nhận môi trường mới.
 

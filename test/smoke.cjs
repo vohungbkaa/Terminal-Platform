@@ -36,10 +36,10 @@ app.on('browser-window-created', (_event, window) => {
       await run("document.documentElement.style.setProperty('--sidebar-width', '232px')");
       await run("document.getElementById('new-terminal').click()");
       await waitFor("terminals.size === 1 && [...terminals.values()][0].running");
-      assert.equal(await run("document.fonts.check('600 13px \"Fira Code\"', 'Xin chào Dự án')"), true);
+      assert.equal(await run("document.fonts.check('500 13px \"Fira Code\"', 'Xin chào Dự án')"), true);
       assert.equal(await run("[...document.fonts].some(face => face.family.includes('Fira Code') && face.status === 'loaded')"), true);
       assert.equal(await run("[...terminals.values()][0].term.options.fontFamily.startsWith(\"'Fira Code'\")"), true);
-      assert.equal(await run("[...terminals.values()][0].term.options.fontWeight"), '600');
+      assert.equal(await run("[...terminals.values()][0].term.options.fontWeight"), '500');
       assert.equal(await run("document.querySelector('.pane-model-btn').hidden"), true);
       assert.equal(await run("document.getElementById('commands-panel').classList.contains('open')"), true);
       await run('scheduleHideAgentDrawer(); new Promise(resolve => setTimeout(resolve, 300))');
