@@ -6,6 +6,65 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'renderer.js'), 'utf8');
 const context = vm.createContext({});
+vm.runInContext(source.slice(source.indexOf('function quoteDroppedPaths('), source.indexOf('function fit(')), context);
+
+test('dropped file paths preserve spaces and quotes without executing a command', () => {
+  assert.equal(context.quoteDroppedPaths(['/tmp/Dự án/file.txt', "/tmp/it's $(echo no).txt"], '/bin/zsh'), "'/tmp/Dự án/file.txt' '/tmp/it'\\''s $(echo no).txt' ");
+  assert.equal(context.quoteDroppedPaths(["C:\\it's here\\file.txt"], 'powershell.exe'), "'C:\\it''s here\\file.txt' ");
+  assert.equal(context.quoteDroppedPaths(['C:\\a b\\file.txt'], 'cmd.exe'), '"C:\\a b\\file.txt" ');
+  assert.throws(() => context.quoteDroppedPaths(['/tmp/file\ncommand'], '/bin/zsh'));
+  assert.throws(() => context.quoteDroppedPaths([''], '/bin/zsh'));
+  assert.throws(() => context.quoteDroppedPaths(['C:\\%PATH%\\file.txt'], 'cmd.exe'));
+});
+
+test('composition edits replace changed Vietnamese characters instead of duplicating the word', () => {
+  assert.equal(context.compositionDelta('Tie', 'Tiê'), '\x7fê');
+  assert.equal(context.compositionDelta('Tiê', 'Tiế'), '\x7fế');
+  assert.equal(context.compositionDelta('Tiếng', 'Tiếng'), '');
+  assert.equal(context.compositionDelta('Tiếng', ''), '\x7f'.repeat(5));
+});
+
+test('overlapping identical IME commits do not duplicate live agent text', () => {
+  const events = new Map();
+  const sent = [];
+  const timers = [];
+  let nativeInput;
+  const input = vm.createContext({
+    api: { input: async (_id, data) => { sent.push(data); } }, error: assert.fail,
+    setTimeout: callback => { timers.push(callback); }
+  });
+  vm.runInContext(source.slice(source.indexOf('function compositionDelta('), source.indexOf('function fit(')), input);
+  const textarea = { value: '' };
+  input.installAgentComposition({ id: 'pane', running: true, runningAgent: 'claude',
+    host: { addEventListener: (name, callback) => events.set(name, callback), classList: { toggle() {}, remove() {} } },
+    term: { textarea, onData: callback => { nativeInput = callback; } }
+  });
+  for (const value of ['a', 'aa']) {
+    events.get('compositionstart')();
+    textarea.value = value;
+    events.get('input')();
+    events.get('compositionend')();
+  }
+  assert.equal(sent.join(''), 'aa');
+  nativeInput('a');
+  nativeInput('a');
+  events.get('compositionstart')();
+  textarea.value = 'aab';
+  events.get('input')();
+  nativeInput('b');
+  nativeInput('\x1b[C');
+  events.get('compositionend')();
+  nativeInput('b');
+  for (const callback of timers) callback();
+  nativeInput('\r');
+  assert.equal(sent.join(''), 'aab\x1b[C\r');
+  events.get('compositionstart')();
+  textarea.value += 'Tie';
+  events.get('input')();
+  events.get('compositionend')();
+  nativeInput('Tiế');
+  assert.equal(sent.join(''), 'aab\x1b[C\rTie\x7fế');
+});
 
 test('terminal layout requests are combined into one fit per frame', () => {
   const frames = [];
@@ -158,7 +217,7 @@ test('shell startup shows commands for restored/restarted terminals without flas
   let opened = 0;
   const pending = new Set();
   const startup = vm.createContext({
-    api: { start: async () => {} }, pendingAgentLaunches: pending, agentDrawerAutoPane: null,
+    api: { start: async () => {} }, state: { settings: { shell: '/bin/zsh' } }, pendingAgentLaunches: pending, agentDrawerAutoPane: null,
     fit: () => {}, openAgentDrawer: () => { opened++; }
   });
   vm.runInContext(source.slice(source.indexOf('async function start(view)'), source.indexOf('async function newTerminal(')), startup);

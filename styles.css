@@ -825,6 +825,8 @@ body.platform-darwin.sidebar-collapsed #topbar {
   transition: border-color 0.14s ease;
 }
 
+.live-agent-composition .composition-view { visibility: hidden; }
+
 .pane:hover {
   border-color: var(--border-strong);
 }

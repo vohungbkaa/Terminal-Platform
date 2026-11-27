@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 contextBridge.exposeInMainWorld('desktop', {
   load: () => ipcRenderer.invoke('workspace:load'),
   agentModels: agent => ipcRenderer.invoke('agent:models', agent),
@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('desktop', {
   setOpacity: value => ipcRenderer.invoke('window:opacity', value),
   copy: data => ipcRenderer.invoke('clipboard:copy', data),
   paste: () => ipcRenderer.invoke('clipboard:paste'),
+  filePaths: files => files.map(file => webUtils.getPathForFile(file)),
   folder: () => ipcRenderer.invoke('project:folder'),
   createFolder: name => ipcRenderer.invoke('project:create-folder', name),
   start: id => ipcRenderer.invoke('terminal:start', id),

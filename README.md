@@ -109,6 +109,7 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
   - Khay Dock các terminal đang ẩn chạy ngầm (Hidden Panes) dạng capsule giúp khôi phục nhanh mà không làm nhảy bố cục.
   - Hiển thị badge tỉ lệ lưới hiện tại (`1×1`, `1×2`, `2×2`...) và nhãn shell đang dùng.
 - **Bảng lệnh Agent (Drawer kính mờ)**: Bảng lệnh trượt nổi bên phải, hỗ trợ kéo thả lệnh vào bất kỳ terminal nào hoặc bấm để mở ngay terminal mới. Tự mở khi mở shell trống (terminal mới, khôi phục hoặc khởi động lại) và tự thu lại sau khi gửi lệnh từ bảng hoặc khi agent trong terminal đó bắt đầu chạy.
+- **Kéo file từ Finder/Explorer**: Thả một hoặc nhiều file/ảnh vào terminal để chèn đường dẫn đã trích dẫn theo shell; không tự nhấn Enter hay gửi nội dung file. Thả vào Launchpad sẽ mở terminal rồi chèn đường dẫn. Với CMD, tên file chứa `%` hoặc `!` cần chuyển sang PowerShell.
 - **Model trên toolbar terminal**: Theo dõi trạng thái đang hiển thị của agy, Codex, Claude và Gemini theo từng tiến trình. agy lấy danh sách từ `agy models`; Codex đọc danh sách và các mức reasoning trong cache của CLI (`CODEX_HOME/models_cache.json`, mặc định `~/.codex/models_cache.json`). Chọn model và mức rồi bấm **Áp dụng** mới gửi lệnh. Claude/Gemini và Codex chưa có cache dùng menu `/model` gốc để giữ đúng các lựa chọn của agent. Mở lại ứng dụng để làm mới danh sách đã tải.
 - **Bảng Thiết Lập (Settings Slide-over)**: Dạng panel kính mờ trượt từ cạnh phải, gồm bộ thẻ preview trực quan cho 5 theme màu, xem trước màu terminal, thanh trượt cỡ chữ, độ đục cửa sổ từ 40–100% và chọn shell mặc định. Độ đục áp dụng cho cả nền lẫn chữ; Hủy hoặc Esc khôi phục cấu hình đã lưu.
 - **Hệ thống 5 Theme màu sắc**: Graphite, Obsidian, Warm Dusk, Nord Frost và Hacker. Hacker dùng nền đen, chữ xanh phosphor, viền xanh và bảng màu 16-ANSI riêng. Theme và độ đục đã lưu được khôi phục khi mở lại ứng dụng.
@@ -119,6 +120,8 @@ Giao diện được đồng bộ hoàn toàn với phong cách macOS Native / G
 ## Nhập tiếng Việt trên Mac
 
 Terminal dùng Fira Code 6.2 đi kèm ứng dụng, chữ thường medium 500 và chữ đậm 700. Font được nạp trước khi đo lưới ký tự; không cần cài font riêng. Giấy phép SIL Open Font License nằm trong `fonts/OFL.txt`.
+
+Trong chat của agent, chữ Latin và tiếng Việt đang ghép dấu được cập nhật xuống agent ngay khi nhập, thay vì chờ Space hoặc phím mũi tên xác nhận từ. Các thay đổi dấu được gửi như thao tác sửa chữ để không nhân đôi từ khi kết thúc IME. Những bộ gõ ngoài nhóm Latin/tiếng Việt vẫn dùng cơ chế xác nhận gốc của xterm.
 
 Từ bản 1.0.1, terminal trên Mac tự chọn locale UTF-8 nếu ứng dụng được mở với locale trống hoặc `C`/ASCII. Locale UTF-8 có sẵn được giữ lại. Điều này tránh lỗi xóa một phần byte của ký tự có dấu khi bộ gõ thay dấu hoặc khi bấm Backspace. Cần thoát rồi mở lại ứng dụng sau khi cập nhật để các shell nhận môi trường mới.
 
@@ -134,6 +137,6 @@ Khi thoát ứng dụng hoặc đóng cửa sổ cuối cùng, ứng dụng xác
 
 Tên model trên toolbar phụ thuộc vào trạng thái mà CLI hiển thị. Footer bị ẩn, bị cắt do terminal quá hẹp hoặc đổi định dạng có thể khiến ứng dụng chưa xác định được model; khi đó dùng menu `/model` của agent để kiểm tra.
 
-Bản này chưa chuyển thanh chọn thiết bị/Run mobile, icon project tùy chỉnh, kéo ảnh/file vào terminal và kéo thay đổi chiều rộng từng cột từ bản Swift. Flutter/Android có thể dùng CLI với SDK cài riêng; build/chạy iOS vẫn cần Mac và Xcode. Đây là ứng dụng desktop, không phải ứng dụng iPhone/iPad.
+Bản này chưa chuyển thanh chọn thiết bị/Run mobile, icon project tùy chỉnh và kéo thay đổi chiều rộng từng cột từ bản Swift. Flutter/Android có thể dùng CLI với SDK cài riêng; build/chạy iOS vẫn cần Mac và Xcode. Đây là ứng dụng desktop, không phải ứng dụng iPhone/iPad.
 
 Bộ cài Windows hiện chưa ký chứng chỉ; bản Mac chỉ ký ad-hoc, chưa ký bằng Developer ID hoặc notarize. SmartScreen hoặc Gatekeeper có thể chặn bản tải xuống. Chưa kiểm thử cài đặt trực tiếp trên Windows hoặc chạy trên Mac Intel; CI cần được chạy trên repository mới để xác nhận thêm.

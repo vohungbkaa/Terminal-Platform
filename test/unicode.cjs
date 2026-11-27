@@ -102,6 +102,63 @@ app.on('browser-window-created', (_event, window) => {
         await waitFor(line('Vit'));
         console.log('PASS: Bash handles accented editing when no locale is inherited');
       }
+      if (process.platform !== 'win32') {
+        const fakeAgent = path.join(temporary, 'claude');
+        fs.writeFileSync(fakeAgent, String.raw`process.stdin.setRawMode(true);
+process.stdin.setEncoding('utf8');
+let text = '';
+process.stdout.write('LIVE_AGENT_READY\r\n');
+process.stdin.on('data', data => {
+  data = data.replace(/\x1b\[[0-9;?]*[A-Za-z~]/g, '');
+  for (const character of data) {
+    if (character === '\u0003') process.exit(0);
+    if (character === '\u007f') text = Array.from(text).slice(0, -1).join('');
+    else text += character;
+  }
+  process.stdout.write('LIVE:' + JSON.stringify(text) + '\r\n');
+});
+`);
+        await run(`window.desktop.input([...terminals.keys()][0], ${JSON.stringify(`node "${fakeAgent}"\r`)})`);
+        await waitFor("[...terminals.values()][0].runningAgent === 'claude'");
+        await run('[...terminals.values()][0].term.focus()');
+        const live = expected => `(() => { const buffer = [...terminals.values()][0].term.buffer.active; return Array.from({length: buffer.length}, (_, i) => buffer.getLine(i).translateToString(true)).filter(line => line.startsWith('LIVE:')).at(-1) === ${JSON.stringify('LIVE:' + JSON.stringify(expected))}; })()`;
+        for (const word of ['T', 'Ti', 'Tiê', 'Tiế', 'Tiến', 'Tiếng']) {
+          await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: word, selectionStart: word.length, selectionEnd: word.length });
+          await waitFor(live(word));
+        }
+        await insert('Tiếng');
+        await run('new Promise(resolve => setTimeout(resolve, 100))');
+        assert.equal(await run(live('Tiếng')), true);
+        await insert(' ');
+        for (const word of ['V', 'Vi', 'Viê', 'Việ', 'Việt', 'Vi', 'Việt']) {
+          await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: word, selectionStart: word.length, selectionEnd: word.length });
+          await waitFor(live('Tiếng ' + word));
+        }
+        await insert('Việt');
+        await run('new Promise(resolve => setTimeout(resolve, 100))');
+        assert.equal(await run(live('Tiếng Việt')), true);
+        await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: 'x', selectionStart: 1, selectionEnd: 1 });
+        await waitFor(live('Tiếng Việtx'));
+        await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: '', selectionStart: 0, selectionEnd: 0 });
+        await waitFor(live('Tiếng Việt'));
+        await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: '你好', selectionStart: 2, selectionEnd: 2 });
+        await insert('你好');
+        await waitFor(live('Tiếng Việt你好'));
+        await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: 'a', selectionStart: 1, selectionEnd: 1 });
+        await waitFor(live('Tiếng Việt你好a'));
+        key('Right');
+        await insert('a');
+        await run('new Promise(resolve => setTimeout(resolve, 100))');
+        assert.equal(await run(live('Tiếng Việt你好a')), true);
+        await window.webContents.debugger.sendCommand('Input.imeSetComposition', { text: 'b', selectionStart: 1, selectionEnd: 1 });
+        await waitFor(live('Tiếng Việt你好ab'));
+        await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyDown', key: ' ', code: 'Space', text: ' ', windowsVirtualKeyCode: 32 });
+        await window.webContents.debugger.sendCommand('Input.dispatchKeyEvent', { type: 'keyUp', key: ' ', code: 'Space', windowsVirtualKeyCode: 32 });
+        await waitFor(live('Tiếng Việt你好ab '));
+        console.log('PASS: agent receives IME text before Space/Right, Vietnamese corrections/cancel and native CJK commit stay correct');
+        await run("window.desktop.input([...terminals.keys()][0], '\\u0003')");
+        await waitFor("![...terminals.values()][0].runningAgent");
+      }
     } catch (error) {
       console.error(error);
       console.error(await run('(() => { const buffer = [...terminals.values()][0].term.buffer.active; return {cursorX: buffer.cursorX, cursorY: buffer.cursorY, baseY: buffer.baseY, lines: Array.from({length: buffer.length}, (_, i) => buffer.getLine(i).translateToString(true)).filter(Boolean)}; })()'));

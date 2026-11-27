@@ -44,6 +44,21 @@ app.on('browser-window-created', (_event, window) => {
       assert.equal(await run("document.getElementById('commands-panel').classList.contains('open')"), true);
       await run('scheduleHideAgentDrawer(); new Promise(resolve => setTimeout(resolve, 300))');
       assert.equal(await run("document.getElementById('commands-panel').classList.contains('open')"), true);
+      const droppedFiles = [path.join(temporary, 'Dự án có dấu.txt'), path.join(temporary, "it's $(no).png")];
+      for (const file of droppedFiles) fs.writeFileSync(file, 'drop fixture');
+      window.webContents.debugger.attach('1.3');
+      try {
+        await run("globalThis.dropInput = []; globalThis.dropListener = [...terminals.values()][0].term.onData(data => dropInput.push(data)); const picker = document.createElement('input'); picker.type = 'file'; picker.multiple = true; picker.hidden = true; picker.id = 'native-drop-fixture'; document.body.append(picker); void 0");
+        const { root } = await window.webContents.debugger.sendCommand('DOM.getDocument');
+        const { nodeId } = await window.webContents.debugger.sendCommand('DOM.querySelector', { nodeId: root.nodeId, selector: '#native-drop-fixture' });
+        await window.webContents.debugger.sendCommand('DOM.setFileInputFiles', { nodeId, files: droppedFiles });
+        const actualPaths = await run("globalThis.nativeDropFiles = [...document.getElementById('native-drop-fixture').files]; window.desktop.filePaths(nativeDropFiles)");
+        assert.deepEqual(actualPaths.map(file => fs.realpathSync(file)), droppedFiles.map(file => fs.realpathSync(file)));
+        assert.equal(await run("(() => { const transfer = new DataTransfer(); for (const file of document.getElementById('native-drop-fixture').files) transfer.items.add(file); const pane = document.querySelector('.pane'); const over = new DragEvent('dragover', { dataTransfer: transfer, bubbles: true, cancelable: true }); pane.dispatchEvent(over); pane.dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true })); return over.defaultPrevented; })()"), true);
+        assert.equal(await run("dropInput.join('').includes(quoteDroppedPaths(window.desktop.filePaths([...document.getElementById('native-drop-fixture').files]), [...terminals.values()][0].shell))"), true);
+        assert.equal(await run("dropInput.join('').includes(String.fromCharCode(13))"), false);
+        await run("dropListener.dispose(); document.getElementById('native-drop-fixture').remove(); window.desktop.input([...terminals.keys()][0], String.fromCharCode(3))");
+      } finally { window.webContents.debugger.detach(); }
       if (process.platform !== 'win32') {
         const fakeClaude = path.join(temporary, 'claude');
         fs.writeFileSync(fakeClaude, `process.stdout.write('Claude Code v9.0.0\\nSonnet 5 · API Usage Billing\\n');
@@ -259,8 +274,14 @@ setInterval(() => {}, 1000);
       } finally { dialog.showOpenDialog = originalOpenDialog; }
       await run("act(() => update(s => { s.panes = {home: []}; s.projects = []; s.selected = 'home'; }))()");
       await waitFor('terminals.size === 0');
+      await run("(() => { const transfer = new DataTransfer(); for (const file of nativeDropFiles) transfer.items.add(file); document.getElementById('empty').dispatchEvent(new DragEvent('drop', { dataTransfer: transfer, bubbles: true, cancelable: true })); })()");
+      await run('actionQueue');
+      await waitFor('terminals.size === 1 && [...terminals.values()][0].running');
+      await waitFor("(() => { const buffer = [...terminals.values()][0].term.buffer.active; return Array.from({ length: buffer.length }, (_, i) => buffer.getLine(i).translateToString(false)).join('').includes('Dự án có dấu.txt'); })()");
+      await run("act(() => update(s => { s.panes.home = []; }))()");
+      await waitFor('terminals.size === 0');
       assert.equal(await run("document.getElementById('error').hidden"), true);
-      console.log('PASS: automatic command drawer, model/effort grouping, real PTY, all four agents and agent switching, Codex catalog/reasoning, drop autorun, grouped models and apply, shell switching/restart, Ctrl+C, platform shortcuts, renderer isolation, workspace restore and persistence');
+      console.log('PASS: native file drops into panes/Launchpad without Enter, automatic command drawer, all four agents, model/effort grouping, real PTY, shell switching/restart, renderer isolation and persistence');
       clearTimeout(timeout); window.destroy();
       // shortcut: leave the temporary profile because Windows locks it until exit; add parent cleanup for frequent runs.
       app.exit(0);

@@ -1244,6 +1244,101 @@ function queueFit(view) {
   });
 }
 
+function quoteDroppedPaths(paths, shell) {
+  if (!paths.length || paths.some(path => !path || /[\x00-\x1f\x7f]/.test(path))) {
+    throw new Error('Không đọc được đường dẫn file được thả.');
+  }
+  return paths.map(path => {
+    if (shell === 'cmd.exe') {
+      // shortcut: CMD expansion characters need separate quoting; use PowerShell for these filenames.
+      if (/["%!]/.test(path)) throw new Error('Tên file chứa ký tự CMD không hỗ trợ. Hãy dùng PowerShell cho file này.');
+      return `"${path}"`;
+    }
+    return `'${path.replace(/'/g, shell === 'powershell.exe' || shell === 'pwsh.exe' ? "''" : "'\\''")}'`;
+  }).join(' ') + ' ';
+}
+
+function pasteDroppedFiles(view, files) {
+  if (!view.running) throw new Error('Terminal đã dừng. Bấm khởi động lại để mở lại.');
+  const paths = api.filePaths(Array.from(files));
+  view.term.paste(quoteDroppedPaths(paths, view.shell));
+  view.term.focus();
+}
+
+function compositionDelta(previous, next) {
+  const before = Array.from(previous);
+  const after = Array.from(next);
+  let common = 0;
+  while (common < before.length && common < after.length && before[common] === after[common]) common++;
+  return '\x7f'.repeat(before.length - common) + after.slice(common).join('');
+}
+
+function installAgentComposition(view) {
+  const textarea = view.term.textarea;
+  const pending = [];
+  let active = null;
+  const send = data => { if (view.running && data) api.input(view.id, data).catch(error); };
+  const latin = text => /^[\x20-\x7e\u00c0-\u024f\u1e00-\u1eff]*$/.test(text);
+  view.host.addEventListener('compositionstart', () => {
+    if (!view.running) return;
+    active = { start: textarea.value.length, raw: '', sent: '', live: true };
+    pending.push(active);
+  }, true);
+  view.host.addEventListener('input', () => {
+    if (!active) return;
+    active.raw = textarea.value.slice(active.start);
+    const text = active.raw.normalize('NFC');
+    // shortcut: stream Latin/Vietnamese edits; other IMEs retain xterm's native composition handling.
+    active.live = Boolean(view.runningAgent) && latin(text);
+    const next = active.live ? text : '';
+    send(compositionDelta(active.sent, next));
+    active.sent = next;
+    view.host.classList.toggle('live-agent-composition', active.live);
+  }, true);
+  view.host.addEventListener('compositionend', () => {
+    const ended = active;
+    if (!ended) return;
+    active = null;
+    view.host.classList.remove('live-agent-composition');
+    // xterm queues the native commit first; clean up cancellation or a superseded commit after it.
+    setTimeout(() => {
+      const index = pending.indexOf(ended);
+      if (index < 0) return;
+      if (!ended.nativeSent && !textarea.value.slice(ended.start, active?.start)) send(compositionDelta(ended.sent, ''));
+      pending.splice(index, 1);
+    }, 0);
+  });
+  view.term.onData(data => {
+    let remaining = data;
+    while (remaining && pending.length) {
+      let index = pending.findIndex(item => item.raw && item.raw === remaining);
+      if (index < 0) index = pending.findIndex(item => item.raw && remaining.startsWith(item.raw));
+      if (index < 0) index = pending.findIndex(item => item.live && item.raw && item.raw.startsWith(remaining));
+      if (index < 0) {
+        const first = pending[0];
+        // The final IME candidate can differ from its last visible preview.
+        if (first.live && active !== first && !/[\x00-\x1f\x7f]/.test(remaining)) {
+          pending.shift();
+          send(compositionDelta(first.sent, remaining.normalize('NFC')));
+          remaining = '';
+        }
+        break;
+      }
+      const item = pending[index];
+      const nativeSent = item.nativeSent;
+      if (active === item) {
+        pending.splice(0, index);
+        item.nativeSent = true;
+      } else pending.splice(0, index + 1);
+      view.host.classList.remove('live-agent-composition');
+      if (!item.live && !nativeSent) break;
+      if (item.live) send(compositionDelta(item.sent, item.raw.normalize('NFC')));
+      remaining = remaining.length < item.raw.length ? '' : remaining.slice(item.raw.length);
+    }
+    send(remaining);
+  });
+}
+
 function fit(view) {
   if (view.node.hidden || view.host.clientWidth < 30 || view.host.clientHeight < 30) return;
   try {
@@ -1355,7 +1450,7 @@ function makeTerminal(pane) {
   updatePaneModelButton(view, pane);
   view.observer.observe(host);
 
-  term.onData(data => { if (view.running) api.input(pane.id, data).catch(error); });
+  installAgentComposition(view);
   term.onTitleChange(value => { node.title = value; });
   term.onWriteParsed(() => syncAgentModel(view));
   term.attachCustomKeyEventHandler(event => {
@@ -1370,7 +1465,7 @@ function makeTerminal(pane) {
   });
 
   node.addEventListener('dragover', event => {
-    if (event.dataTransfer.types.includes('application/x-termanager-command')) {
+    if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('Files')) {
       event.preventDefault();
       node.classList.add('drag-over');
     }
@@ -1378,6 +1473,11 @@ function makeTerminal(pane) {
   node.addEventListener('dragleave', () => node.classList.remove('drag-over'));
   node.addEventListener('drop', event => {
     node.classList.remove('drag-over');
+    if (event.dataTransfer.files.length) {
+      event.preventDefault();
+      try { pasteDroppedFiles(view, event.dataTransfer.files); } catch (reason) { error(reason); }
+      return;
+    }
     const command = event.dataTransfer.getData('application/x-termanager-command');
     const cmdTitle = event.dataTransfer.getData('application/x-termanager-title');
     if (!command) return;
@@ -1405,7 +1505,9 @@ function makeTerminal(pane) {
 
 async function start(view) {
   try {
+    const shell = state.settings.shell;
     await api.start(view.id);
+    view.shell = shell;
     view.running = true;
     view.node.classList.remove('exited');
     fit(view);
@@ -1652,9 +1754,14 @@ $('copy-path').addEventListener('click', act(async () => {
 }));
 
 // Drop Agent Command onto empty Launchpad
+for (const type of ['dragover', 'drop']) {
+  document.addEventListener(type, event => {
+    if (event.dataTransfer.types.includes('Files')) event.preventDefault();
+  });
+}
 const emptyEl = $('empty');
 emptyEl.addEventListener('dragover', event => {
-  if (event.dataTransfer.types.includes('application/x-termanager-command')) {
+  if (event.dataTransfer.types.includes('application/x-termanager-command') || event.dataTransfer.types.includes('Files')) {
     event.preventDefault();
     emptyEl.classList.add('drag-over');
     $('launchpad-tip').textContent = 'Thả vào đây để mở Terminal ngay';
@@ -1667,6 +1774,16 @@ emptyEl.addEventListener('dragleave', () => {
 emptyEl.addEventListener('drop', event => {
   emptyEl.classList.remove('drag-over');
   $('launchpad-tip').textContent = 'Mẹo: Kéo lệnh Agent từ thanh bên vào đây để mở nhanh';
+  if (event.dataTransfer.files.length) {
+    event.preventDefault();
+    const files = Array.from(event.dataTransfer.files);
+    act(async () => {
+      await newTerminal();
+      const pane = state.panes[state.selected].at(-1);
+      pasteDroppedFiles(terminals.get(pane.id), files);
+    })();
+    return;
+  }
   const command = event.dataTransfer.getData('application/x-termanager-command');
   const title = event.dataTransfer.getData('application/x-termanager-title');
   if (!command) return;
